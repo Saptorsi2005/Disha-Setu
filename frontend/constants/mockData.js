@@ -1,36 +1,4 @@
-export type ProjectStatus = 'In Progress' | 'Completed' | 'Delayed';
-
-export interface Milestone {
-  title: string;
-  completed: boolean;
-  date: string;
-}
-
-export interface Project {
-  id: string;
-  name: string;
-  department: string;
-  contractor: string;
-  category: 'Road' | 'Bridge' | 'Hospital' | 'Metro' | 'College' | 'Water' | 'Park';
-  status: ProjectStatus;
-  location: string;
-  area: string;
-  district: string;
-  distance: string;
-  startDate: string;
-  expectedCompletion: string;
-  budget: string;
-  completion: number;
-  lastUpdated: string;
-  delayReason?: string;
-  civicImpact: string;
-  beneficiaries: string;
-  impactStat: string;
-  coordinates: { lat: number; lng: number };
-  milestones: Milestone[];
-}
-
-export const MOCK_PROJECTS: Project[] = [
+export const MOCK_PROJECTS = [
   {
     id: '1',
     name: 'Hebbal Flyover Expansion',
@@ -175,17 +143,7 @@ export const MOCK_PROJECTS: Project[] = [
   },
 ];
 
-export interface NotificationData {
-  id: string;
-  type: 'new_project' | 'status_change' | 'completed' | 'delay';
-  title: string;
-  body: string;
-  time: string;
-  projectId: string;
-  read: boolean;
-}
-
-export const MOCK_NOTIFICATIONS: NotificationData[] = [
+export const MOCK_NOTIFICATIONS = [
   {
     id: 'n1',
     type: 'new_project',
@@ -233,17 +191,7 @@ export const MOCK_NOTIFICATIONS: NotificationData[] = [
   },
 ];
 
-export interface ActivityItem {
-  id: string;
-  type: 'feedback' | 'saved' | 'reported';
-  title: string;
-  status: 'Pending' | 'Under Review' | 'Resolved' | 'Saved';
-  projectName: string;
-  date: string;
-  ticketId?: string;
-}
-
-export const MOCK_ACTIVITY: ActivityItem[] = [
+export const MOCK_ACTIVITY = [
   {
     id: 'a1',
     type: 'feedback',
@@ -272,7 +220,7 @@ export const MOCK_ACTIVITY: ActivityItem[] = [
   },
 ];
 
-export const CATEGORY_ICONS: Record<string, string> = {
+export const CATEGORY_ICONS = {
   Bridge: '🌉',
   Metro: '🚇',
   Hospital: '🏥',
@@ -282,7 +230,7 @@ export const CATEGORY_ICONS: Record<string, string> = {
   Park: '🌳',
 };
 
-export const STATUS_COLORS: Record<ProjectStatus, string> = {
+export const STATUS_COLORS = {
   'In Progress': '#00D4AA',
   'Completed': '#10B981',
   'Delayed': '#EF4444',
