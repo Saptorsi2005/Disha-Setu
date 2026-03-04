@@ -1,15 +1,27 @@
+/**
+ * app/_layout.jsx
+ * Root layout — wraps app in AuthProvider, connects Socket.io
+ */
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View } from 'react-native';
+import { useEffect } from 'react';
 import { useColorScheme } from '../hooks/use-color-scheme';
+import { AuthProvider } from '../context/AuthContext';
+import { connectSocket } from '../services/socketService';
 import '../global.css';
 
 export const unstable_settings = {
   initialRouteName: 'index',
 };
 
-export default function RootLayout() {
+function AppShell() {
   const { isDark } = useColorScheme();
+
+  useEffect(() => {
+    // Connect Socket.io when app loads
+    connectSocket().catch(err => console.warn('[Layout] Socket connect error:', err.message));
+  }, []);
 
   return (
     <View style={{ flex: 1 }} className={isDark ? 'dark' : ''}>
@@ -25,5 +37,13 @@ export default function RootLayout() {
         <Stack.Screen name="analytics" options={{ animation: 'slide_from_right' }} />
       </Stack>
     </View>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <AuthProvider>
+      <AppShell />
+    </AuthProvider>
   );
 }

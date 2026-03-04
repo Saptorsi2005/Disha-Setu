@@ -1,29 +1,179 @@
-import { useState } from 'react';
+/**
+ * app/auth.jsx — Real OTP + Google + Guest authentication
+ * Google OAuth enabled with expo-auth-session
+ */
+import { useState, useEffect } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity,
-    KeyboardAvoidingView, Platform, ScrollView
+    KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Alert
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
 import { useColorScheme } from '../hooks/use-color-scheme';
+import { useAuth } from '../context/AuthContext';
+import { sendOTP, verifyOTP, loginWithGoogle, loginAsGuest } from '../services/authService';
+
+// Required for Google Sign-In
+WebBrowser.maybeCompleteAuthSession();
+
+// Google OAuth Client ID (from backend .env)
+const GOOGLE_CLIENT_ID = '821266969114-kihsrvi0uehnfv265ij0c02av1bl4b5l.apps.googleusercontent.com';
 
 export default function AuthScreen() {
     const router = useRouter();
+    const { login } = useAuth();
     const [mode, setMode] = useState('phone');
     const [phone, setPhone] = useState('');
     const [otp, setOtp] = useState(['', '', '', '', '', '']);
+    const [loading, setLoading] = useState(false);
     const { isDark } = useColorScheme();
     const iconDim = isDark ? '#9CA3AF' : '#6B7280';
     const bgCard = isDark ? '#111827' : '#FFFFFF';
     const bgCardBorder = isDark ? '#1F2937' : '#E5E7EB';
 
-    const handleSendOTP = () => {
-        if (phone.length === 10) setMode('otp');
+    // Google OAuth hook
+    const [request, response, promptAsync] = Google.useAuthRequest({
+        androidClientId: GOOGLE_CLIENT_ID,
+        iosClientId: GOOGLE_CLIENT_ID,
+        webClientId: GOOGLE_CLIENT_ID,
+        redirectUri: Platform.OS === 'web' 
+            ? 'http://localhost:8081' 
+            : undefined,
+    });
+
+    // Handle Google OAuth response
+    useEffect(() => {
+        if (response?.type === 'success') {
+            console.log('Google OAuth Response:', JSON.stringify(response, null, 2));
+            const { authentication, params } = response;
+            
+            // For web, the structure might be different
+            // Try to get idToken from different possible locations
+            let idToken = null;
+            
+            if (authentication?.idToken) {
+                idToken = authentication.idToken;
+                console.log('Found idToken in authentication.idToken');
+            } else if (params?.id_token) {
+                idToken = params.id_token;
+                console.log('Found idToken in params.id_token');
+            } else if (authentication?.accessToken) {
+                // For web OAuth, we might only get an access token
+                // We can use it to fetch user info and create a simple token
+                console.log('Only access token available, using alternative auth method');
+                handleGoogleAccessToken(authentication.accessToken);
+                return;
+            }
+            
+            if (idToken) {
+                console.log('ID Token found, length:', idToken.length);
+                handleGoogleSuccess(idToken);
+            } else {
+                console.error('No idToken or accessToken in response:', response);
+                Alert.alert('Authentication Error', 'Could not get authentication token from Google. Please try again.');
+            }
+        } else if (response?.type === 'error') {
+            console.error('Google OAuth Error:', response.error);
+            Alert.alert('Sign-In Error', response.error?.message || 'Failed to sign in with Google');
+        }
+    }, [response]);
+
+    // Alternative: Use access token to get user info then authenticate
+    const handleGoogleAccessToken = async (accessToken) => {
+        setLoading(true);
+        try {
+            console.log('Fetching Google user info with access token...');
+            // Get user info from Google
+            const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { Authorization: `Bearer ${accessToken}` },
+            });
+            const userInfo = await userInfoResponse.json();
+            console.log('Google user info:', userInfo);
+            
+            // Create a simple token payload (backend will accept this in dev mode)
+            const simpleToken = btoa(JSON.stringify({
+                sub: userInfo.sub,
+                name: userInfo.name,
+                picture: userInfo.picture,
+                email: userInfo.email,
+            }));
+            
+            await handleGoogleSuccess(simpleToken);
+        } catch (err) {
+            console.error('Error fetching Google user info:', err);
+            Alert.alert('Authentication Error', 'Failed to get user information from Google');
+            setLoading(false);
+        }
     };
 
-    const handleVerify = () => router.replace('/(tabs)/home');
-    const handleGuest = () => router.replace('/(tabs)/home');
+    const handleGoogleSuccess = async (idToken) => {
+        setLoading(true);
+        try {
+            console.log('Sending idToken to backend...');
+            const data = await loginWithGoogle(idToken);
+            console.log('Backend response:', data);
+            login(data.user);
+            router.replace('/(tabs)/home');
+        } catch (err) {
+            console.error('Google sign-in error:', err);
+            Alert.alert('Google Sign-In Failed', err.message || 'Please try again');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSendOTP = async () => {
+        if (phone.length !== 10) return;
+        setLoading(true);
+        try {
+            await sendOTP(phone);
+            setMode('otp');
+        } catch (err) {
+            Alert.alert('Error', err.message || 'Failed to send OTP');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleVerify = async () => {
+        const code = otp.join('');
+        if (code.length < 6) return;
+        setLoading(true);
+        try {
+            const data = await verifyOTP(phone, code);
+            login(data.user);
+            router.replace('/(tabs)/home');
+        } catch (err) {
+            Alert.alert('Invalid OTP', err.message || 'Verification failed');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Google Sign-In handler
+    const handleGoogleSignIn = async () => {
+        try {
+            await promptAsync();
+        } catch (err) {
+            Alert.alert('Error', 'Failed to open Google Sign-In');
+        }
+    };
+
+    const handleGuest = async () => {
+        setLoading(true);
+        try {
+            const data = await loginAsGuest();
+            login(data.user);
+            router.replace('/(tabs)/home');
+        } catch (err) {
+            router.replace('/(tabs)/home');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <SafeAreaView className="flex-1 bg-main">
@@ -79,18 +229,17 @@ export default function AuthScreen() {
                                     style={{
                                         backgroundColor: phone.length === 10 ? '#00D4AA' : bgCardBorder,
                                         shadowColor: phone.length === 10 ? '#00D4AA' : 'transparent',
-                                        shadowOffset: { width: 0, height: 4 },
-                                        shadowOpacity: 0.4,
-                                        shadowRadius: 12,
+                                        shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 12,
                                         elevation: phone.length === 10 ? 8 : 0,
                                     }}
                                     onPress={handleSendOTP}
-                                    disabled={phone.length !== 10}
+                                    disabled={phone.length !== 10 || loading}
                                     activeOpacity={0.85}
                                 >
-                                    <Text className={`font-bold text-lg ${phone.length === 10 ? 'text-white' : 'text-txtMutedAlt'}`}>
-                                        Send OTP
-                                    </Text>
+                                    {loading
+                                        ? <ActivityIndicator color="#000" />
+                                        : <Text className={`font-bold text-lg ${phone.length === 10 ? 'text-white' : 'text-txtMutedAlt'}`}>Send OTP</Text>
+                                    }
                                 </TouchableOpacity>
 
                                 <View className="flex-row items-center mb-4">
@@ -102,7 +251,7 @@ export default function AuthScreen() {
                                 {/* Google button */}
                                 <TouchableOpacity
                                     className="w-full flex-row items-center justify-center bg-card rounded-2xl py-4 mb-6 border border-cardBorder gap-3"
-                                    onPress={handleGuest}
+                                    onPress={handleGoogleSignIn}
                                     activeOpacity={0.85}
                                 >
                                     <View className="w-5 h-5 rounded-full bg-[#EA4335] items-center justify-center">
@@ -111,7 +260,7 @@ export default function AuthScreen() {
                                     <Text className="text-txt font-semibold text-base">Continue with Google</Text>
                                 </TouchableOpacity>
 
-                                <TouchableOpacity onPress={handleGuest} activeOpacity={0.7} className="items-center">
+                                <TouchableOpacity onPress={handleGuest} activeOpacity={0.7} className="items-center" disabled={loading}>
                                     <Text className="text-txtMutedAlt text-sm">
                                         Continue as <Text className="text-[#00D4AA] font-semibold">Guest</Text>
                                     </Text>
@@ -122,11 +271,8 @@ export default function AuthScreen() {
                                 {/* OTP boxes */}
                                 <View className="flex-row justify-between mb-8">
                                     {otp.map((digit, i) => (
-                                        <View
-                                            key={i}
-                                            className="w-12 h-14 rounded-xl bg-card border items-center justify-center"
-                                            style={{ borderColor: digit ? '#00D4AA' : bgCardBorder }}
-                                        >
+                                        <View key={i} className="w-12 h-14 rounded-xl bg-card border items-center justify-center"
+                                            style={{ borderColor: digit ? '#00D4AA' : bgCardBorder }}>
                                             <Text className="text-txt text-2xl font-bold">{digit || '–'}</Text>
                                         </View>
                                     ))}
@@ -141,6 +287,7 @@ export default function AuthScreen() {
                                                 className="flex-1 mx-1 h-14 rounded-2xl items-center justify-center"
                                                 style={{ backgroundColor: key === 'verify' ? '#00D4AA' : bgCard }}
                                                 activeOpacity={0.7}
+                                                disabled={loading}
                                                 onPress={() => {
                                                     const newOtp = [...otp];
                                                     if (key === 'back') {
@@ -154,11 +301,13 @@ export default function AuthScreen() {
                                                     }
                                                 }}
                                             >
-                                                {key === 'back'
-                                                    ? <Ionicons name="backspace-outline" size={22} color={iconDim} />
-                                                    : key === 'verify'
-                                                        ? <Ionicons name="checkmark" size={24} color="#000" />
-                                                        : <Text className="text-xl font-bold text-txt">{key}</Text>
+                                                {loading && key === 'verify'
+                                                    ? <ActivityIndicator color="#000" />
+                                                    : key === 'back'
+                                                        ? <Ionicons name="backspace-outline" size={22} color={iconDim} />
+                                                        : key === 'verify'
+                                                            ? <Ionicons name="checkmark" size={24} color="#000" />
+                                                            : <Text className="text-xl font-bold text-txt">{key}</Text>
                                                 }
                                             </TouchableOpacity>
                                         ))}

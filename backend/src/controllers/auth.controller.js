@@ -75,10 +75,16 @@ const googleAuth = async (req, res, next) => {
         // For scaffold: decode and trust (dev only)
         let googlePayload;
         try {
-            // Decode without verification for dev scaffold
-            const base64Url = idToken.split('.')[1];
-            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-            googlePayload = JSON.parse(Buffer.from(base64, 'base64').toString());
+            // Check if it's a JWT (3 parts) or simple base64 token
+            if (idToken.includes('.')) {
+                // JWT format: decode middle part
+                const base64Url = idToken.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                googlePayload = JSON.parse(Buffer.from(base64, 'base64').toString());
+            } else {
+                // Simple base64 format (from accessToken flow)
+                googlePayload = JSON.parse(Buffer.from(idToken, 'base64').toString());
+            }
         } catch (_) {
             return res.status(401).json({ error: 'Invalid Google token' });
         }

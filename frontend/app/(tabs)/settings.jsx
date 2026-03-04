@@ -1,8 +1,12 @@
-import { View, Text, ScrollView, TouchableOpacity, Switch, Image, Linking } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Switch, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useColorScheme } from '../../hooks/use-color-scheme';
+import { useAuth } from '../../context/AuthContext';
+import { logout as authLogout, fetchMe } from '../../services/authService';
+import { disconnectSocket } from '../../services/socketService';
 
 function SettingRow({ icon, title, subtitle, value, type = 'nav', danger, onPress, action }) {
     const { isDark } = useColorScheme();
@@ -19,26 +23,17 @@ function SettingRow({ icon, title, subtitle, value, type = 'nav', danger, onPres
                 <Ionicons name={icon} size={20} color={danger ? '#EF4444' : iconDim} />
             </View>
             <View className="flex-1 justify-center">
-                <Text className={`text-base font-medium mb-0.5 ${danger ? 'text-[#EF4444]' : 'text-txt'}`}>
-                    {title}
-                </Text>
-                {subtitle && (
-                    <Text className="text-txtMuted text-xs">{subtitle}</Text>
-                )}
+                <Text className={`text-base font-medium mb-0.5 ${danger ? 'text-[#EF4444]' : 'text-txt'}`}>{title}</Text>
+                {subtitle && <Text className="text-txtMuted text-xs">{subtitle}</Text>}
             </View>
-
             {type === 'nav' && (
                 <View className="flex-row items-center">
                     {value && <Text className="text-txtMuted mr-2">{value}</Text>}
                     <Ionicons name="chevron-forward" size={20} color={iconDim} />
                 </View>
             )}
-
             {type === 'switch' && action}
-
-            {type === 'link' && (
-                <Ionicons name="open-outline" size={20} color={iconDim} />
-            )}
+            {type === 'link' && <Ionicons name="open-outline" size={20} color={iconDim} />}
         </TouchableOpacity>
     );
 }
@@ -46,11 +41,45 @@ function SettingRow({ icon, title, subtitle, value, type = 'nav', danger, onPres
 export default function SettingsScreen() {
     const router = useRouter();
     const { isDark, toggleColorScheme } = useColorScheme();
+    const { user, logout } = useAuth();
+    const [profileData, setProfileData] = useState(null);
+    const [loading, setLoading] = useState(true);
 
-    const handleLogout = () => {
-        // Add logout logic here
+    useEffect(() => {
+        // Fetch full user profile from backend
+        fetchMe()
+            .then(data => {
+                setProfileData(data);
+                setLoading(false);
+            })
+            .catch(err => {
+                console.error('[Settings] Failed to fetch profile:', err.message);
+                // Use fallback data from context if API fails
+                setProfileData(user);
+                setLoading(false);
+            });
+    }, [user]);
+
+    const handleLogout = async () => {
+        disconnectSocket();
+        await authLogout();
+        logout();
         router.replace('/auth');
     };
+
+    if (loading) {
+        return (
+            <SafeAreaView className="flex-1 bg-main items-center justify-center">
+                <ActivityIndicator size="large" color="#00D4AA" />
+                <Text className="text-txtMuted mt-3 text-sm">Loading profile...</Text>
+            </SafeAreaView>
+        );
+    }
+
+    const displayName = profileData?.name || (profileData?.is_guest ? 'Guest User' : 'DishaSetu User');
+    const displaySub = profileData?.phone ? `+91 ${profileData.phone}` : (profileData?.is_guest ? 'Guest session' : 'Logged in');
+    const civicLevel = profileData?.civic_level || 'Civic Newcomer';
+    const avatarUrl = profileData?.avatar_url || 'https://i.pravatar.cc/100?img=11';
 
     return (
         <SafeAreaView className="flex-1 bg-main">
@@ -62,15 +91,15 @@ export default function SettingsScreen() {
                 {/* Profile Card */}
                 <View className="mx-6 mb-8 bg-card rounded-3xl p-5 border border-cardBorder flex-row items-center">
                     <Image
-                        source={{ uri: 'https://i.pravatar.cc/100?img=11' }}
+                        source={{ uri: avatarUrl }}
                         className="w-16 h-16 rounded-full border-2 border-[#00D4AA]"
                     />
                     <View className="ml-4 flex-1">
-                        <Text className="text-txt text-lg font-bold">Pritam Bhowmik</Text>
-                        <Text className="text-txtMuted text-sm mb-1">+91 98765 43210</Text>
+                        <Text className="text-txt text-lg font-bold">{displayName}</Text>
+                        <Text className="text-txtMuted text-sm mb-1">{displaySub}</Text>
                         <View className="bg-[#00D4AA20] self-start px-2 py-0.5 rounded flex-row items-center">
                             <Ionicons name="star" size={10} color="#00D4AA" />
-                            <Text className="text-[#00D4AA] text-[10px] font-bold ml-1 uppercase">Civic Guardian</Text>
+                            <Text className="text-[#00D4AA] text-[10px] font-bold ml-1 uppercase">{civicLevel}</Text>
                         </View>
                     </View>
                     <TouchableOpacity className="p-2 bg-surface rounded-full">
@@ -110,7 +139,7 @@ export default function SettingsScreen() {
                             }
                         />
                         <SettingRow
-                            icon={isDark ? "moon" : "sunny"}
+                            icon={isDark ? 'moon' : 'sunny'}
                             title="Dark Mode"
                             type="switch"
                             action={
@@ -122,11 +151,7 @@ export default function SettingsScreen() {
                                 />
                             }
                         />
-                        <SettingRow
-                            icon="language"
-                            title="Language"
-                            value="English"
-                        />
+                        <SettingRow icon="language" title="Language" value="English" />
                     </View>
                 </View>
 
@@ -134,20 +159,9 @@ export default function SettingsScreen() {
                 <View className="px-6 mb-8">
                     <Text className="text-txtMuted text-sm font-semibold mb-3 uppercase tracking-wider ml-2">Support & Legal</Text>
                     <View className="bg-card rounded-3xl px-5 border border-cardBorder">
-                        <SettingRow
-                            icon="help-circle"
-                            title="Help Center & FAQs"
-                        />
-                        <SettingRow
-                            icon="shield-checkmark"
-                            title="Privacy Policy"
-                            type="link"
-                        />
-                        <SettingRow
-                            icon="document-text"
-                            title="Terms of Service"
-                            type="link"
-                        />
+                        <SettingRow icon="help-circle" title="Help Center & FAQs" />
+                        <SettingRow icon="shield-checkmark" title="Privacy Policy" type="link" />
+                        <SettingRow icon="document-text" title="Terms of Service" type="link" />
                     </View>
                 </View>
 
@@ -161,7 +175,7 @@ export default function SettingsScreen() {
                             onPress={handleLogout}
                         />
                     </View>
-                    <Text className="text-txtMuted text-center text-xs mt-6">Disha-Setu v1.0.0 (Build 42)</Text>
+                    <Text className="text-txtMuted text-center text-xs mt-6">Disha-Setu v1.0.0 (Build 1)</Text>
                 </View>
             </ScrollView>
         </SafeAreaView>

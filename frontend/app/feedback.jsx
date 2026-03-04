@@ -1,189 +1,187 @@
+/**
+ * app/feedback.jsx — Real feedback submission to backend
+ */
 import { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput } from 'react-native';
-import { useRouter } from 'expo-router';
+import {
+    View, Text, ScrollView, TouchableOpacity,
+    TextInput, ActivityIndicator, Alert, Image, Platform
+} from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { MOCK_PROJECTS } from '../constants/mockData';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import * as ImagePicker from 'expo-image-picker';
 import { useColorScheme } from '../hooks/use-color-scheme';
+import { submitFeedback } from '../services/feedbackService';
 
 const CATEGORIES = [
-    { id: 'delay', label: 'Delay', icon: 'time-outline' },
-    { id: 'safety', label: 'Safety Issue', icon: 'shield-outline' },
-    { id: 'noise', label: 'Noise', icon: 'volume-high-outline' },
-    { id: 'traffic', label: 'Traffic Issue', icon: 'car-outline' },
-    { id: 'corruption', label: 'Corruption Concern', icon: 'eye-outline' },
-    { id: 'other', label: 'Other', icon: 'ellipsis-horizontal-circle-outline' },
+    { id: 'delay', label: 'Delay', icon: 'time-outline', color: '#F59E0B' },
+    { id: 'safety', label: 'Safety', icon: 'shield-outline', color: '#EF4444' },
+    { id: 'noise', label: 'Noise', icon: 'volume-high-outline', color: '#8B5CF6' },
+    { id: 'traffic', label: 'Traffic', icon: 'car-outline', color: '#F97316' },
+    { id: 'corruption', label: 'Corruption', icon: 'alert-circle-outline', color: '#EC4899' },
+    { id: 'other', label: 'Other', icon: 'help-circle-outline', color: '#6B7280' },
 ];
 
 export default function FeedbackScreen() {
     const router = useRouter();
-    const [selectedProject, setSelectedProject] = useState('');
-    const [selectedCategory, setSelectedCategory] = useState('');
-    const [description, setDescription] = useState('');
-    const [submitted, setSubmitted] = useState(false);
-    const [ticketId] = useState(`GF-2025-${String(Math.floor(1000 + Math.random() * 9000))}`);
+    const { projectId, projectName } = useLocalSearchParams();
     const { isDark } = useColorScheme();
     const iconDim = isDark ? '#9CA3AF' : '#6B7280';
-    const bgCard = isDark ? '#111827' : '#FFFFFF';
-    const bgCardBorder = isDark ? '#1F2937' : '#E5E7EB';
 
-    const handleSubmit = () => {
-        if (selectedProject && selectedCategory && description.trim().length > 10) {
-            setSubmitted(true);
+    const [step, setStep] = useState(1); // 1=category, 2=description, 3=success
+    const [category, setCategory] = useState(null);
+    const [description, setDescription] = useState('');
+    const [photo, setPhoto] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [ticket, setTicket] = useState(null);
+
+    const handlePickPhoto = async () => {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Permission Required', 'Please allow photo access to attach a photo.');
+            return;
+        }
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            quality: 0.7,
+        });
+        if (!result.canceled) {
+            const asset = result.assets[0];
+            setPhoto({ uri: asset.uri, name: `report_${Date.now()}.jpg`, type: 'image/jpeg' });
         }
     };
 
-    if (submitted) {
-        return (
-            <SafeAreaView className="flex-1 bg-[#0A0E1A] items-center justify-center px-8">
-                <View className="items-center">
-                    <View className="w-24 h-24 rounded-full bg-[#10B98120] items-center justify-center mb-6 border border-[#10B981]/30">
-                        <Ionicons name="checkmark-circle" size={52} color="#10B981" />
-                    </View>
-                    <Text className="text-white text-2xl font-bold mb-3">Report Submitted!</Text>
-                    <Text className="text-[#9CA3AF] text-base text-center mb-6 leading-6">
-                        Your complaint has been recorded. Our team will review it shortly.
-                    </Text>
+    const handleSubmit = async () => {
+        if (!category) return Alert.alert('Select a category', 'Please choose an issue type first.');
+        if (description.trim().length < 10) return Alert.alert('Description too short', 'Please describe the issue in at least 10 characters.');
 
-                    <View className="bg-[#111827] rounded-3xl p-5 w-full border border-[#1F2937] mb-8">
-                        <Text className="text-[#6B7280] text-xs text-center mb-2">Your Ticket ID</Text>
-                        <Text className="text-[#00D4AA] text-2xl font-bold text-center font-mono">{ticketId}</Text>
-                        <Text className="text-[#4B5563] text-xs text-center mt-2">Save this ID to track your complaint status</Text>
-                    </View>
-
-                    <TouchableOpacity
-                        className="w-full bg-[#00D4AA] rounded-2xl py-4 items-center mb-3"
-                        style={{ shadowColor: '#00D4AA', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 12, elevation: 8 }}
-                        onPress={() => router.replace('/(tabs)/activity')}
-                        activeOpacity={0.85}
-                    >
-                        <Text className="text-black font-bold text-base">View My Activity</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
-                        <Text className="text-[#6B7280] text-sm">Back to Home</Text>
-                    </TouchableOpacity>
-                </View>
-            </SafeAreaView>
-        );
-    }
-
-    const isValid = selectedProject && selectedCategory && description.trim().length > 10;
+        setLoading(true);
+        try {
+            const data = await submitFeedback({
+                project_id: projectId || '00000000-0000-0000-0000-000000000001',
+                category,
+                description,
+                photo,
+            });
+            setTicket(data.ticketId);
+            setStep(3);
+        } catch (err) {
+            Alert.alert('Submission failed', err.message || 'Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
-        <SafeAreaView className="flex-1 bg-main" edges={['top']}>
-            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                {/* Header */}
-                <View className="px-4 pt-4 pb-4">
-                    <TouchableOpacity className="flex-row items-center mb-4 gap-1" onPress={() => router.back()} activeOpacity={0.7}>
-                        <Ionicons name="arrow-back" size={20} color="#00D4AA" />
-                        <Text className="text-[#00D4AA] font-semibold">Back</Text>
-                    </TouchableOpacity>
-                    <Text className="text-txt text-2xl font-bold mb-1">
-                        Report <Text className="text-[#EF4444]">an Issue</Text>
+        <SafeAreaView className="flex-1 bg-main" edges={['top', 'bottom']}>
+            {/* Header */}
+            <View className="flex-row items-center px-5 py-4 border-b border-cardBorder">
+                <TouchableOpacity onPress={() => step === 2 ? setStep(1) : router.back()} className="mr-4">
+                    <Ionicons name="arrow-back" size={24} color={iconDim} />
+                </TouchableOpacity>
+                <Text className="text-txt text-lg font-bold">
+                    {step === 3 ? 'Report Submitted' : 'Report an Issue'}
+                </Text>
+            </View>
+
+            {step === 3 ? (
+                // Success screen
+                <View className="flex-1 items-center justify-center px-8">
+                    <View className="w-24 h-24 rounded-full bg-[#00D4AA20] items-center justify-center mb-6">
+                        <Ionicons name="checkmark-circle" size={48} color="#00D4AA" />
+                    </View>
+                    <Text className="text-txt text-2xl font-bold mb-3 text-center">Thank You!</Text>
+                    <Text className="text-txtMuted text-center text-sm leading-6 mb-8">
+                        Your report has been submitted successfully. We'll track this and notify you of updates.
                     </Text>
-                    <Text className="text-txtMuted text-sm">Help us improve civic projects in your area</Text>
+                    <View className="bg-card rounded-2xl p-5 w-full border border-cardBorder mb-8">
+                        <Text className="text-txtMuted text-xs text-center mb-2">Ticket ID</Text>
+                        <Text className="text-[#00D4AA] text-3xl font-bold text-center tracking-widest">{ticket}</Text>
+                        <Text className="text-txtMuted text-xs text-center mt-2">Save this ID to track your report</Text>
+                    </View>
+                    <TouchableOpacity
+                        className="w-full bg-[#00D4AA] rounded-2xl py-4 items-center mb-4"
+                        onPress={() => router.back()}
+                    >
+                        <Text className="text-main font-bold text-base">Back to Project</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => { setStep(1); setCategory(null); setDescription(''); setPhoto(null); }}>
+                        <Text className="text-txtMuted text-sm">Submit another report</Text>
+                    </TouchableOpacity>
                 </View>
+            ) : (
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, paddingBottom: 100 }} keyboardShouldPersistTaps="handled">
+                    {projectName && (
+                        <View className="bg-card rounded-2xl p-4 border border-cardBorder mb-6">
+                            <Text className="text-txtMuted text-xs mb-1">Reporting for</Text>
+                            <Text className="text-txt font-bold" numberOfLines={1}>{projectName}</Text>
+                        </View>
+                    )}
 
-                {/* Step 1 */}
-                <View className="px-4 mb-5">
-                    <Text className="text-txtMuted text-xs font-bold uppercase tracking-wider mb-3">1. Select Project</Text>
-                    {MOCK_PROJECTS.map(p => (
-                        <TouchableOpacity
-                            key={p.id}
-                            className="flex-row items-center bg-card rounded-2xl p-3.5 mb-2 border"
-                            style={{ borderColor: selectedProject === p.id ? '#00D4AA' : bgCardBorder }}
-                            onPress={() => setSelectedProject(p.id)}
-                            activeOpacity={0.85}
-                        >
-                            <View
-                                className="w-5 h-5 rounded-full mr-3 border-2 items-center justify-center"
-                                style={{ borderColor: selectedProject === p.id ? '#00D4AA' : iconDim }}
-                            >
-                                {selectedProject === p.id && <View className="w-2.5 h-2.5 rounded-full bg-[#00D4AA]" />}
-                            </View>
-                            <Text className="text-txt text-sm font-medium flex-1" numberOfLines={1}>{p.name}</Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-
-                {/* Step 2 */}
-                <View className="px-4 mb-5">
-                    <Text className="text-txtMuted text-xs font-bold uppercase tracking-wider mb-3">2. Issue Category</Text>
-                    <View className="flex-row flex-wrap gap-2">
+                    {/* Step 1: Category */}
+                    <Text className="text-txt font-bold text-base mb-4">Issue Type</Text>
+                    <View className="flex-row flex-wrap gap-3 mb-8">
                         {CATEGORIES.map(cat => (
                             <TouchableOpacity
                                 key={cat.id}
-                                className="flex-row items-center rounded-2xl px-4 py-3 border gap-2"
+                                className="flex-row items-center rounded-xl px-4 py-3 border"
                                 style={{
-                                    backgroundColor: selectedCategory === cat.id ? '#EF444420' : bgCard,
-                                    borderColor: selectedCategory === cat.id ? '#EF4444' : bgCardBorder,
+                                    backgroundColor: category === cat.id ? `${cat.color}20` : isDark ? '#111827' : '#fff',
+                                    borderColor: category === cat.id ? cat.color : isDark ? '#1F2937' : '#E5E7EB',
                                 }}
-                                onPress={() => setSelectedCategory(cat.id)}
-                                activeOpacity={0.85}
+                                onPress={() => setCategory(cat.id)}
                             >
-                                <Ionicons name={cat.icon} size={16} color={selectedCategory === cat.id ? '#EF4444' : iconDim} />
-                                <Text className={`text-sm font-semibold ${selectedCategory === cat.id ? 'text-[#EF4444]' : 'text-txtMuted'}`}>
+                                <Ionicons name={cat.icon} size={16} color={category === cat.id ? cat.color : iconDim} />
+                                <Text className="ml-2 font-semibold text-sm" style={{ color: category === cat.id ? cat.color : isDark ? '#9CA3AF' : '#6B7280' }}>
                                     {cat.label}
                                 </Text>
                             </TouchableOpacity>
                         ))}
                     </View>
-                </View>
 
-                {/* Step 3 */}
-                <View className="px-4 mb-5">
-                    <Text className="text-txtMuted text-xs font-bold uppercase tracking-wider mb-3">3. Description</Text>
+                    {/* Step 2: Description */}
+                    <Text className="text-txt font-bold text-base mb-4">Description</Text>
                     <TextInput
-                        className="bg-card text-txt rounded-2xl p-4 border border-cardBorder text-sm leading-6"
-                        placeholder="Describe the issue in detail... (min. 10 characters)"
+                        className="bg-card border border-cardBorder rounded-2xl p-4 text-txt text-sm leading-6 mb-6"
+                        style={{ minHeight: 120, textAlignVertical: 'top' }}
+                        placeholder="Describe the issue clearly..."
                         placeholderTextColor={iconDim}
                         multiline
-                        numberOfLines={5}
-                        textAlignVertical="top"
-                        style={{ minHeight: 120 }}
                         value={description}
                         onChangeText={setDescription}
                     />
-                    <Text className="text-txtMuted text-xs mt-1 text-right">{description.length} chars</Text>
-                </View>
 
-                {/* Step 4: Photo */}
-                <View className="px-4 mb-6">
-                    <Text className="text-txtMuted text-xs font-bold uppercase tracking-wider mb-3">4. Photo (Optional)</Text>
+                    {/* Photo attachment */}
+                    <Text className="text-txt font-bold text-base mb-4">Photo (optional)</Text>
                     <TouchableOpacity
-                        className="bg-card rounded-2xl h-24 items-center justify-center border border-dashed border-cardBorder gap-2"
-                        activeOpacity={0.85}
+                        className="bg-card border border-dashed border-cardBorder rounded-2xl p-6 items-center mb-8"
+                        onPress={handlePickPhoto}
                     >
-                        <Ionicons name="camera-outline" size={26} color={iconDim} />
-                        <Text className="text-txtMuted text-sm">Tap to add a photo</Text>
+                        {photo ? (
+                            <View className="w-full">
+                                <Image source={{ uri: photo.uri }} className="w-full h-40 rounded-xl" resizeMode="cover" />
+                                <Text className="text-[#00D4AA] text-sm text-center mt-3 font-semibold">Tap to change photo</Text>
+                            </View>
+                        ) : (
+                            <>
+                                <Ionicons name="camera-outline" size={32} color={iconDim} />
+                                <Text className="text-txtMuted text-sm mt-3">Tap to attach a photo</Text>
+                            </>
+                        )}
                     </TouchableOpacity>
-                </View>
 
-                {/* Submit */}
-                <View className="px-4 mb-8">
+                    {/* Submit */}
                     <TouchableOpacity
-                        className="w-full rounded-2xl py-4 items-center flex-row justify-center gap-2"
-                        style={{
-                            backgroundColor: isValid ? '#EF4444' : bgCard,
-                            shadowColor: isValid ? '#EF4444' : 'transparent',
-                            shadowOffset: { width: 0, height: 4 },
-                            shadowOpacity: 0.4,
-                            shadowRadius: 12,
-                            elevation: isValid ? 8 : 0,
-                            borderWidth: isValid ? 0 : 1,
-                            borderColor: bgCardBorder
-                        }}
+                        className="bg-[#00D4AA] rounded-2xl py-4 items-center"
+                        style={{ shadowColor: '#00D4AA', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 12, elevation: 8 }}
                         onPress={handleSubmit}
-                        disabled={!isValid}
-                        activeOpacity={0.85}
+                        disabled={loading || !category || description.trim().length < 10}
                     >
-                        <Ionicons name="send" size={18} color={isValid ? '#fff' : iconDim} />
-                        <Text className={`font-bold text-lg ${isValid ? 'text-white' : 'text-txtMuted'}`}>
-                            Submit Report
-                        </Text>
+                        {loading ? <ActivityIndicator color="#000" /> : <Text className="text-main font-bold text-base">Submit Report</Text>}
                     </TouchableOpacity>
-                </View>
-            </ScrollView>
+                </ScrollView>
+            )}
         </SafeAreaView>
     );
 }
