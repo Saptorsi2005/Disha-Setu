@@ -2,16 +2,9 @@ import { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Switch } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
-function SettingRow({
-    icon,
-    title,
-    subtitle,
-    value,
-    onValueChange,
-    type = 'toggle',
-    onPress,
-}) {
+function SettingRow({ icon, title, subtitle, value, onValueChange, type = 'toggle', onPress }) {
     return (
         <TouchableOpacity
             className="flex-row items-center px-4 py-4 border-b border-[#1F2937]"
@@ -19,7 +12,7 @@ function SettingRow({
             activeOpacity={type === 'toggle' ? 1 : 0.7}
         >
             <View className="w-10 h-10 rounded-xl bg-[#1A2035] items-center justify-center mr-4">
-                <Text style={{ fontSize: 20 }}>{icon}</Text>
+                <Ionicons name={icon} size={20} color="#9CA3AF" />
             </View>
             <View className="flex-1">
                 <Text className="text-white font-medium text-base">{title}</Text>
@@ -37,7 +30,7 @@ function SettingRow({
                 <Text className="text-[#9CA3AF] text-sm mr-2">{value}</Text>
             )}
             {(type === 'select' || type === 'arrow') && (
-                <Text className="text-[#4B5563]">›</Text>
+                <Ionicons name="chevron-forward" size={18} color="#4B5563" />
             )}
         </TouchableOpacity>
     );
@@ -61,22 +54,23 @@ export default function SettingsScreen() {
                 {/* Profile card */}
                 <View className="mx-4 mb-4 bg-[#111827] rounded-3xl p-4 border border-[#1F2937] flex-row items-center">
                     <View className="w-14 h-14 rounded-2xl bg-[#00D4AA] items-center justify-center mr-4">
-                        <Text style={{ fontSize: 28 }}>👤</Text>
+                        <Ionicons name="person" size={28} color="#000" />
                     </View>
                     <View className="flex-1">
                         <Text className="text-white font-bold text-base">Citizen User</Text>
                         <Text className="text-[#9CA3AF] text-sm">+91 98765 43210</Text>
                     </View>
-                    <TouchableOpacity className="bg-[#1A2035] rounded-xl px-3 py-2 border border-[#1F2937]">
+                    <TouchableOpacity className="bg-[#1A2035] rounded-xl px-3 py-2 border border-[#1F2937] flex-row items-center gap-1">
+                        <Ionicons name="create-outline" size={14} color="#00D4AA" />
                         <Text className="text-[#00D4AA] text-xs font-bold">Edit</Text>
                     </TouchableOpacity>
                 </View>
 
-                {/* Location Section */}
+                {/* Location */}
                 <Text className="text-[#6B7280] text-xs font-bold uppercase tracking-wider px-4 mb-2 mt-2">Location</Text>
                 <View className="mx-4 bg-[#111827] rounded-3xl border border-[#1F2937] overflow-hidden mb-4">
                     <SettingRow
-                        icon="📡"
+                        icon="radio-outline"
                         title="Geo-Fence Alerts"
                         subtitle="Get alerted when near project zones"
                         type="toggle"
@@ -84,7 +78,7 @@ export default function SettingsScreen() {
                         onValueChange={setGeoFence}
                     />
                     <SettingRow
-                        icon="📏"
+                        icon="resize-outline"
                         title="Detection Radius"
                         subtitle="Projects within this range are shown"
                         type="select"
@@ -101,7 +95,7 @@ export default function SettingsScreen() {
                 <Text className="text-[#6B7280] text-xs font-bold uppercase tracking-wider px-4 mb-2">Notifications</Text>
                 <View className="mx-4 bg-[#111827] rounded-3xl border border-[#1F2937] overflow-hidden mb-4">
                     <SettingRow
-                        icon="🔔"
+                        icon="notifications-outline"
                         title="Push Notifications"
                         subtitle="Receive project alerts"
                         type="toggle"
@@ -109,7 +103,7 @@ export default function SettingsScreen() {
                         onValueChange={setNotifications}
                     />
                     <SettingRow
-                        icon="📊"
+                        icon="bar-chart-outline"
                         title="Status Updates"
                         subtitle="When project milestones change"
                         type="toggle"
@@ -122,14 +116,14 @@ export default function SettingsScreen() {
                 <Text className="text-[#6B7280] text-xs font-bold uppercase tracking-wider px-4 mb-2">Appearance</Text>
                 <View className="mx-4 bg-[#111827] rounded-3xl border border-[#1F2937] overflow-hidden mb-4">
                     <SettingRow
-                        icon="🌙"
+                        icon="moon-outline"
                         title="Dark Mode"
                         type="toggle"
                         value={darkMode}
                         onValueChange={setDarkMode}
                     />
                     <SettingRow
-                        icon="🌐"
+                        icon="globe-outline"
                         title="Language"
                         type="select"
                         value={language}
@@ -143,18 +137,19 @@ export default function SettingsScreen() {
                 {/* About */}
                 <Text className="text-[#6B7280] text-xs font-bold uppercase tracking-wider px-4 mb-2">About</Text>
                 <View className="mx-4 bg-[#111827] rounded-3xl border border-[#1F2937] overflow-hidden mb-4">
-                    <SettingRow icon="📄" title="Privacy Policy" type="arrow" />
-                    <SettingRow icon="📋" title="Terms of Service" type="arrow" />
-                    <SettingRow icon="ℹ️" title="App Version" subtitle="v1.0.0 (Build 1)" type="select" value="" />
+                    <SettingRow icon="document-text-outline" title="Privacy Policy" type="arrow" />
+                    <SettingRow icon="reader-outline" title="Terms of Service" type="arrow" />
+                    <SettingRow icon="information-circle-outline" title="App Version" subtitle="v1.0.0 (Build 1)" type="select" value="" />
                 </View>
 
                 {/* Logout */}
                 <TouchableOpacity
-                    className="mx-4 mb-8 bg-[#EF444415] rounded-3xl py-4 items-center border border-[#EF4444]/30"
+                    className="mx-4 mb-8 bg-[#EF444415] rounded-3xl py-4 items-center border border-[#EF4444]/30 flex-row justify-center gap-2"
                     onPress={() => router.replace('/auth')}
                     activeOpacity={0.85}
                 >
-                    <Text className="text-[#EF4444] font-bold text-base">🚪 Sign Out</Text>
+                    <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+                    <Text className="text-[#EF4444] font-bold text-base">Sign Out</Text>
                 </TouchableOpacity>
             </ScrollView>
         </SafeAreaView>

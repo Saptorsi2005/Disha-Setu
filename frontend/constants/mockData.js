@@ -147,7 +147,7 @@ export const MOCK_NOTIFICATIONS = [
   {
     id: 'n1',
     type: 'new_project',
-    title: '📍 New Project Nearby',
+    title: 'New Project Nearby',
     body: 'A ₹120 Cr Hebbal Flyover project is 400m from your location.',
     time: '2 min ago',
     projectId: '1',
@@ -156,7 +156,7 @@ export const MOCK_NOTIFICATIONS = [
   {
     id: 'n2',
     type: 'delay',
-    title: '⚠️ Project Delayed',
+    title: 'Project Delayed',
     body: 'Rajajinagar Hospital upgrade has been delayed. New ETA: Oct 2025.',
     time: '1 hour ago',
     projectId: '3',
@@ -165,7 +165,7 @@ export const MOCK_NOTIFICATIONS = [
   {
     id: 'n3',
     type: 'status_change',
-    title: '🔄 Status Updated',
+    title: 'Status Updated',
     body: 'KG Layout Metro Extension: Tunneling Phase 1 marked complete.',
     time: '3 hours ago',
     projectId: '2',
@@ -174,7 +174,7 @@ export const MOCK_NOTIFICATIONS = [
   {
     id: 'n4',
     type: 'completed',
-    title: '✅ Project Completed',
+    title: 'Project Completed',
     body: 'ORR Surface Repair (Marathahalli–Sarjapur) is now complete!',
     time: 'Yesterday',
     projectId: '4',
@@ -183,7 +183,7 @@ export const MOCK_NOTIFICATIONS = [
   {
     id: 'n5',
     type: 'new_project',
-    title: '📍 New Project Nearby',
+    title: 'New Project Nearby',
     body: 'Visvesvaraya Tech College new block construction started (5.7 km away).',
     time: '2 days ago',
     projectId: '5',
@@ -220,14 +220,15 @@ export const MOCK_ACTIVITY = [
   },
 ];
 
+// Values are MaterialIcons icon names
 export const CATEGORY_ICONS = {
-  Bridge: '🌉',
-  Metro: '🚇',
-  Hospital: '🏥',
-  Road: '🛣️',
-  College: '🏫',
-  Water: '💧',
-  Park: '🌳',
+  Bridge: 'toll',
+  Metro: 'subway',
+  Hospital: 'local-hospital',
+  Road: 'add-road',
+  College: 'school',
+  Water: 'water-drop',
+  Park: 'park',
 };
 
 export const STATUS_COLORS = {

@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { MOCK_PROJECTS, CATEGORY_ICONS } from '../../constants/mockData';
 
 const CATEGORIES = ['All', 'Road', 'Bridge', 'Hospital', 'Metro', 'College'];
@@ -31,11 +33,13 @@ export default function SearchScreen() {
         <SafeAreaView className="flex-1 bg-[#0A0E1A]">
             {/* Header */}
             <View className="px-4 pt-4 pb-3">
-                <Text className="text-white text-2xl font-bold mb-4">Search <Text className="text-[#6366F1]">Projects</Text></Text>
+                <Text className="text-white text-2xl font-bold mb-4">
+                    Search <Text className="text-[#6366F1]">Projects</Text>
+                </Text>
 
                 {/* Search bar */}
                 <View className="flex-row items-center bg-[#111827] rounded-2xl border border-[#1F2937] mb-4 px-4">
-                    <Text style={{ fontSize: 16 }} className="mr-3">🔍</Text>
+                    <Ionicons name="search" size={18} color="#4B5563" style={{ marginRight: 10 }} />
                     <TextInput
                         className="flex-1 text-white py-3.5 text-base"
                         placeholder="Project name, area, department..."
@@ -45,7 +49,7 @@ export default function SearchScreen() {
                     />
                     {query.length > 0 && (
                         <TouchableOpacity onPress={() => setQuery('')}>
-                            <Text className="text-[#6B7280] text-lg">✕</Text>
+                            <Ionicons name="close-circle" size={18} color="#6B7280" />
                         </TouchableOpacity>
                     )}
                 </View>
@@ -55,11 +59,13 @@ export default function SearchScreen() {
                     {CATEGORIES.map(cat => (
                         <TouchableOpacity
                             key={cat}
-                            className="mr-2 px-4 py-2 rounded-full flex-row items-center gap-1"
+                            className="mr-2 px-4 py-2 rounded-full flex-row items-center gap-1.5"
                             style={{ backgroundColor: category === cat ? '#6366F1' : '#111827', borderWidth: 1, borderColor: category === cat ? '#6366F1' : '#1F2937' }}
                             onPress={() => setCategory(cat)}
                         >
-                            {cat !== 'All' && <Text style={{ fontSize: 14 }}>{CATEGORY_ICONS[cat]}</Text>}
+                            {cat !== 'All' && (
+                                <MaterialIcons name={CATEGORY_ICONS[cat] || 'construction'} size={14} color={category === cat ? '#fff' : '#9CA3AF'} />
+                            )}
                             <Text className={`text-sm font-semibold ${category === cat ? 'text-white' : 'text-[#9CA3AF]'}`}>{cat}</Text>
                         </TouchableOpacity>
                     ))}
@@ -87,7 +93,7 @@ export default function SearchScreen() {
 
                 {results.length === 0 && (
                     <View className="items-center mt-16">
-                        <Text style={{ fontSize: 48 }} className="mb-4">🔍</Text>
+                        <Ionicons name="search-outline" size={48} color="#374151" style={{ marginBottom: 16 }} />
                         <Text className="text-white font-bold text-lg mb-2">No projects found</Text>
                         <Text className="text-[#6B7280] text-sm text-center px-8">Try adjusting your search terms or filters</Text>
                     </View>
@@ -103,19 +109,25 @@ export default function SearchScreen() {
                             className="mx-4 mb-3 bg-[#111827] rounded-3xl p-4 border border-[#1F2937]"
                         >
                             <View className="flex-row items-center">
-                                <View className="w-12 h-12 rounded-2xl bg-[#1A2035] items-center justify-center mr-3">
-                                    <Text style={{ fontSize: 24 }}>{CATEGORY_ICONS[p.category] || '🏗️'}</Text>
+                                <View className="w-12 h-12 rounded-2xl items-center justify-center mr-3" style={{ backgroundColor: s.text + '20' }}>
+                                    <MaterialIcons name={CATEGORY_ICONS[p.category] || 'construction'} size={24} color={s.text} />
                                 </View>
                                 <View className="flex-1">
                                     <Text className="text-white font-bold text-base mb-1" numberOfLines={1}>{p.name}</Text>
                                     <Text className="text-[#6B7280] text-xs mb-2">{p.area} · {p.department}</Text>
                                     <View className="flex-row items-center gap-3">
-                                        <Text style={{ color: s.text }} className="text-xs font-bold">● {p.status}</Text>
-                                        <Text className="text-[#9CA3AF] text-xs">📍 {p.distance}</Text>
+                                        <View className="flex-row items-center gap-1">
+                                            <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: s.text }} />
+                                            <Text style={{ color: s.text }} className="text-xs font-bold">{p.status}</Text>
+                                        </View>
+                                        <View className="flex-row items-center gap-1">
+                                            <Ionicons name="location-outline" size={11} color="#9CA3AF" />
+                                            <Text className="text-[#9CA3AF] text-xs">{p.distance}</Text>
+                                        </View>
                                         <Text className="text-[#9CA3AF] text-xs">{p.completion}% done</Text>
                                     </View>
                                 </View>
-                                <Text className="text-[#4B5563] text-lg">›</Text>
+                                <Ionicons name="chevron-forward" size={18} color="#4B5563" />
                             </View>
                         </TouchableOpacity>
                     );

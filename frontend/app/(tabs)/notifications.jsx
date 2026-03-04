@@ -1,20 +1,14 @@
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { MOCK_NOTIFICATIONS } from '../../constants/mockData';
 
-const NOTIF_ICONS = {
-    new_project: '📍',
-    status_change: '🔄',
-    completed: '✅',
-    delay: '⚠️',
-};
-
-const NOTIF_COLORS = {
-    new_project: '#00D4AA',
-    status_change: '#6366F1',
-    completed: '#10B981',
-    delay: '#EF4444',
+const NOTIF_META = {
+    new_project: { icon: 'location', color: '#00D4AA' },
+    status_change: { icon: 'refresh-circle', color: '#6366F1' },
+    completed: { icon: 'checkmark-circle', color: '#10B981' },
+    delay: { icon: 'warning', color: '#EF4444' },
 };
 
 export default function NotificationsScreen() {
@@ -26,9 +20,7 @@ export default function NotificationsScreen() {
             {/* Header */}
             <View className="px-4 pt-4 pb-3 flex-row items-center justify-between">
                 <View>
-                    <Text className="text-white text-2xl font-bold">
-                        Notifications
-                    </Text>
+                    <Text className="text-white text-2xl font-bold">Notifications</Text>
                     {unreadCount > 0 && (
                         <Text className="text-[#9CA3AF] text-sm">{unreadCount} unread</Text>
                     )}
@@ -42,7 +34,7 @@ export default function NotificationsScreen() {
                 {/* Geo-fence alert banner */}
                 <View className="mx-4 mb-4 bg-[#00D4AA15] rounded-3xl p-4 border border-[#00D4AA]/30 flex-row items-center">
                     <View className="w-10 h-10 rounded-xl bg-[#00D4AA] items-center justify-center mr-3">
-                        <Text style={{ fontSize: 20 }}>📡</Text>
+                        <Ionicons name="radio" size={20} color="#000" />
                     </View>
                     <View className="flex-1">
                         <Text className="text-[#00D4AA] font-bold text-sm">Geo-Fence Active</Text>
@@ -52,7 +44,7 @@ export default function NotificationsScreen() {
 
                 {/* Notifications list */}
                 {MOCK_NOTIFICATIONS.map((notif) => {
-                    const color = NOTIF_COLORS[notif.type];
+                    const meta = NOTIF_META[notif.type] || NOTIF_META.new_project;
                     return (
                         <TouchableOpacity
                             key={notif.id}
@@ -64,9 +56,9 @@ export default function NotificationsScreen() {
                                 <View className="flex-row items-start">
                                     <View
                                         className="w-12 h-12 rounded-2xl items-center justify-center mr-3 flex-shrink-0"
-                                        style={{ backgroundColor: color + '20' }}
+                                        style={{ backgroundColor: meta.color + '20' }}
                                     >
-                                        <Text style={{ fontSize: 22 }}>{NOTIF_ICONS[notif.type]}</Text>
+                                        <Ionicons name={meta.icon} size={22} color={meta.color} />
                                     </View>
                                     <View className="flex-1">
                                         <View className="flex-row items-center justify-between mb-1">
@@ -77,10 +69,11 @@ export default function NotificationsScreen() {
                                                 <View className="w-2 h-2 rounded-full bg-[#00D4AA]" />
                                             )}
                                         </View>
-                                        <Text className="text-[#9CA3AF] text-xs leading-4 mb-2">
-                                            {notif.body}
-                                        </Text>
-                                        <Text className="text-[#4B5563] text-xs">{notif.time}</Text>
+                                        <Text className="text-[#9CA3AF] text-xs leading-4 mb-2">{notif.body}</Text>
+                                        <View className="flex-row items-center gap-1">
+                                            <Ionicons name="time-outline" size={11} color="#4B5563" />
+                                            <Text className="text-[#4B5563] text-xs">{notif.time}</Text>
+                                        </View>
                                     </View>
                                 </View>
                             </View>
@@ -88,9 +81,9 @@ export default function NotificationsScreen() {
                     );
                 })}
 
-                {/* Empty state reminder */}
+                {/* Reminder */}
                 <View className="mx-4 mt-2 mb-6 items-center rounded-3xl bg-[#111827] p-6 border border-[#1F2937]">
-                    <Text style={{ fontSize: 32 }} className="mb-3">🔔</Text>
+                    <Ionicons name="notifications-outline" size={32} color="#4B5563" style={{ marginBottom: 12 }} />
                     <Text className="text-[#6B7280] text-sm text-center">
                         You'll receive alerts when entering{'\n'}a geo-fenced project zone
                     </Text>

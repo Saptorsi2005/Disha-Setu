@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { View, Text, Animated, Easing } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 export default function SplashScreen() {
     const router = useRouter();
@@ -14,55 +15,21 @@ export default function SplashScreen() {
     useEffect(() => {
         const dotLoop = Animated.loop(
             Animated.sequence([
-                Animated.timing(dotAnimation, {
-                    toValue: 1,
-                    duration: 600,
-                    easing: Easing.inOut(Easing.ease),
-                    useNativeDriver: true,
-                }),
-                Animated.timing(dotAnimation, {
-                    toValue: 0,
-                    duration: 600,
-                    easing: Easing.inOut(Easing.ease),
-                    useNativeDriver: true,
-                }),
+                Animated.timing(dotAnimation, { toValue: 1, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+                Animated.timing(dotAnimation, { toValue: 0, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
             ])
         );
 
         Animated.sequence([
             Animated.parallel([
-                Animated.spring(logoScale, {
-                    toValue: 1,
-                    tension: 60,
-                    friction: 7,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(logoOpacity, {
-                    toValue: 1,
-                    duration: 600,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(glowOpacity, {
-                    toValue: 1,
-                    duration: 800,
-                    useNativeDriver: true,
-                }),
+                Animated.spring(logoScale, { toValue: 1, tension: 60, friction: 7, useNativeDriver: true }),
+                Animated.timing(logoOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
+                Animated.timing(glowOpacity, { toValue: 1, duration: 800, useNativeDriver: true }),
             ]),
-            Animated.timing(taglineOpacity, {
-                toValue: 1,
-                duration: 500,
-                delay: 200,
-                useNativeDriver: true,
-            }),
-        ]).start(() => {
-            dotLoop.start();
-        });
+            Animated.timing(taglineOpacity, { toValue: 1, duration: 500, delay: 200, useNativeDriver: true }),
+        ]).start(() => dotLoop.start());
 
-
-        const timer = setTimeout(() => {
-            router.replace('/onboarding');
-        }, 3000);
-
+        const timer = setTimeout(() => router.replace('/onboarding'), 3000);
         return () => clearTimeout(timer);
     }, []);
 
@@ -84,9 +51,11 @@ export default function SplashScreen() {
                     style={{ transform: [{ scale: logoScale }], opacity: logoOpacity }}
                     className="items-center mb-8"
                 >
-                    <View className="w-24 h-24 rounded-3xl bg-[#00D4AA] items-center justify-center mb-5 shadow-lg"
-                        style={{ shadowColor: '#00D4AA', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 20, elevation: 20 }}>
-                        <Text style={{ fontSize: 44 }}>📍</Text>
+                    <View
+                        className="w-24 h-24 rounded-3xl bg-[#00D4AA] items-center justify-center mb-5"
+                        style={{ shadowColor: '#00D4AA', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 20, elevation: 20 }}
+                    >
+                        <Ionicons name="location" size={44} color="#000" />
                     </View>
                     <Text className="text-white text-4xl font-bold tracking-tight">
                         Geo<Text className="text-[#00D4AA]">Fence</Text>
@@ -103,11 +72,7 @@ export default function SplashScreen() {
                 {/* Loading dots */}
                 <View className="flex-row gap-2 absolute bottom-16">
                     {[dot1Opacity, dot2Opacity, dot3Opacity].map((opacity, i) => (
-                        <Animated.View
-                            key={i}
-                            style={{ opacity }}
-                            className="w-2 h-2 rounded-full bg-[#00D4AA]"
-                        />
+                        <Animated.View key={i} style={{ opacity }} className="w-2 h-2 rounded-full bg-[#00D4AA]" />
                     ))}
                 </View>
             </View>

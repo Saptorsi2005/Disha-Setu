@@ -2,15 +2,16 @@ import { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { MOCK_PROJECTS } from '../constants/mockData';
 
 const CATEGORIES = [
-    { id: 'delay', label: 'Delay', icon: '⏱️' },
-    { id: 'safety', label: 'Safety Issue', icon: '⚠️' },
-    { id: 'noise', label: 'Noise', icon: '🔊' },
-    { id: 'traffic', label: 'Traffic Issue', icon: '🚦' },
-    { id: 'corruption', label: 'Corruption Concern', icon: '🔍' },
-    { id: 'other', label: 'Other', icon: '📋' },
+    { id: 'delay', label: 'Delay', icon: 'time-outline' },
+    { id: 'safety', label: 'Safety Issue', icon: 'shield-outline' },
+    { id: 'noise', label: 'Noise', icon: 'volume-high-outline' },
+    { id: 'traffic', label: 'Traffic Issue', icon: 'car-outline' },
+    { id: 'corruption', label: 'Corruption Concern', icon: 'eye-outline' },
+    { id: 'other', label: 'Other', icon: 'ellipsis-horizontal-circle-outline' },
 ];
 
 export default function FeedbackScreen() {
@@ -32,7 +33,7 @@ export default function FeedbackScreen() {
             <SafeAreaView className="flex-1 bg-[#0A0E1A] items-center justify-center px-8">
                 <View className="items-center">
                     <View className="w-24 h-24 rounded-full bg-[#10B98120] items-center justify-center mb-6 border border-[#10B981]/30">
-                        <Text style={{ fontSize: 48 }}>✅</Text>
+                        <Ionicons name="checkmark-circle" size={52} color="#10B981" />
                     </View>
                     <Text className="text-white text-2xl font-bold mb-3">Report Submitted!</Text>
                     <Text className="text-[#9CA3AF] text-base text-center mb-6 leading-6">
@@ -68,15 +69,17 @@ export default function FeedbackScreen() {
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 {/* Header */}
                 <View className="px-4 pt-4 pb-4">
-                    <TouchableOpacity className="flex-row items-center mb-4" onPress={() => router.back()} activeOpacity={0.7}>
-                        <Text className="text-[#00D4AA] text-lg mr-2">←</Text>
+                    <TouchableOpacity className="flex-row items-center mb-4 gap-1" onPress={() => router.back()} activeOpacity={0.7}>
+                        <Ionicons name="arrow-back" size={20} color="#00D4AA" />
                         <Text className="text-[#00D4AA] font-semibold">Back</Text>
                     </TouchableOpacity>
-                    <Text className="text-white text-2xl font-bold mb-1">Report <Text className="text-[#EF4444]">an Issue</Text></Text>
+                    <Text className="text-white text-2xl font-bold mb-1">
+                        Report <Text className="text-[#EF4444]">an Issue</Text>
+                    </Text>
                     <Text className="text-[#9CA3AF] text-sm">Help us improve civic projects in your area</Text>
                 </View>
 
-                {/* Step 1: Select Project */}
+                {/* Step 1 */}
                 <View className="px-4 mb-5">
                     <Text className="text-[#9CA3AF] text-xs font-bold uppercase tracking-wider mb-3">1. Select Project</Text>
                     {MOCK_PROJECTS.map(p => (
@@ -98,14 +101,14 @@ export default function FeedbackScreen() {
                     ))}
                 </View>
 
-                {/* Step 2: Category */}
+                {/* Step 2 */}
                 <View className="px-4 mb-5">
                     <Text className="text-[#9CA3AF] text-xs font-bold uppercase tracking-wider mb-3">2. Issue Category</Text>
                     <View className="flex-row flex-wrap gap-2">
                         {CATEGORIES.map(cat => (
                             <TouchableOpacity
                                 key={cat.id}
-                                className="flex-row items-center rounded-2xl px-4 py-3 border"
+                                className="flex-row items-center rounded-2xl px-4 py-3 border gap-2"
                                 style={{
                                     backgroundColor: selectedCategory === cat.id ? '#EF444420' : '#111827',
                                     borderColor: selectedCategory === cat.id ? '#EF4444' : '#1F2937',
@@ -113,7 +116,7 @@ export default function FeedbackScreen() {
                                 onPress={() => setSelectedCategory(cat.id)}
                                 activeOpacity={0.85}
                             >
-                                <Text style={{ fontSize: 16 }} className="mr-2">{cat.icon}</Text>
+                                <Ionicons name={cat.icon} size={16} color={selectedCategory === cat.id ? '#EF4444' : '#9CA3AF'} />
                                 <Text className={`text-sm font-semibold ${selectedCategory === cat.id ? 'text-[#EF4444]' : 'text-[#9CA3AF]'}`}>
                                     {cat.label}
                                 </Text>
@@ -122,7 +125,7 @@ export default function FeedbackScreen() {
                     </View>
                 </View>
 
-                {/* Step 3: Description */}
+                {/* Step 3 */}
                 <View className="px-4 mb-5">
                     <Text className="text-[#9CA3AF] text-xs font-bold uppercase tracking-wider mb-3">3. Description</Text>
                     <TextInput
@@ -139,14 +142,14 @@ export default function FeedbackScreen() {
                     <Text className="text-[#4B5563] text-xs mt-1 text-right">{description.length} chars</Text>
                 </View>
 
-                {/* Step 4: Photo optional */}
+                {/* Step 4: Photo */}
                 <View className="px-4 mb-6">
                     <Text className="text-[#9CA3AF] text-xs font-bold uppercase tracking-wider mb-3">4. Photo (Optional)</Text>
                     <TouchableOpacity
-                        className="bg-[#111827] rounded-2xl h-24 items-center justify-center border border-dashed border-[#374151]"
+                        className="bg-[#111827] rounded-2xl h-24 items-center justify-center border border-dashed border-[#374151] gap-2"
                         activeOpacity={0.85}
                     >
-                        <Text style={{ fontSize: 24 }} className="mb-1">📷</Text>
+                        <Ionicons name="camera-outline" size={26} color="#4B5563" />
                         <Text className="text-[#6B7280] text-sm">Tap to add a photo</Text>
                     </TouchableOpacity>
                 </View>
@@ -154,7 +157,7 @@ export default function FeedbackScreen() {
                 {/* Submit */}
                 <View className="px-4 mb-8">
                     <TouchableOpacity
-                        className="w-full rounded-2xl py-4 items-center"
+                        className="w-full rounded-2xl py-4 items-center flex-row justify-center gap-2"
                         style={{
                             backgroundColor: isValid ? '#EF4444' : '#1F2937',
                             shadowColor: isValid ? '#EF4444' : 'transparent',
@@ -167,8 +170,9 @@ export default function FeedbackScreen() {
                         disabled={!isValid}
                         activeOpacity={0.85}
                     >
+                        <Ionicons name="send" size={18} color={isValid ? '#fff' : '#4B5563'} />
                         <Text className={`font-bold text-lg ${isValid ? 'text-white' : 'text-[#4B5563]'}`}>
-                            🚨 Submit Report
+                            Submit Report
                         </Text>
                     </TouchableOpacity>
                 </View>

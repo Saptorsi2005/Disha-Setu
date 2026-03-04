@@ -1,14 +1,16 @@
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { MOCK_PROJECTS } from '../constants/mockData';
 
 const CATEGORY_STATS = [
-    { category: 'Roads', count: 5, budget: '₹88 Cr', color: '#F59E0B', icon: '🛣️' },
-    { category: 'Metro', count: 2, budget: '₹840 Cr', color: '#6366F1', icon: '🚇' },
-    { category: 'Hospitals', count: 1, budget: '₹45 Cr', color: '#EF4444', icon: '🏥' },
-    { category: 'Bridges', count: 2, budget: '₹240 Cr', color: '#00D4AA', icon: '🌉' },
-    { category: 'Education', count: 2, budget: '₹62 Cr', color: '#10B981', icon: '🏫' },
+    { category: 'Roads', count: 5, budget: '₹88 Cr', color: '#F59E0B', iconName: 'add-road', percent: 9 },
+    { category: 'Metro', count: 2, budget: '₹840 Cr', color: '#6366F1', iconName: 'subway', percent: 89 },
+    { category: 'Hospitals', count: 1, budget: '₹45 Cr', color: '#EF4444', iconName: 'local-hospital', percent: 5 },
+    { category: 'Bridges', count: 2, budget: '₹240 Cr', color: '#00D4AA', iconName: 'toll', percent: 26 },
+    { category: 'Education', count: 2, budget: '₹62 Cr', color: '#10B981', iconName: 'school', percent: 7 },
 ];
 
 function BarChart({ data }) {
@@ -30,23 +32,13 @@ function DonutProgress({ value, color, size = 80 }) {
     return (
         <View style={{ width: size, height: size }} className="items-center justify-center">
             <View
-                style={{
-                    width: size,
-                    height: size,
-                    borderRadius: size / 2,
-                    borderWidth: 8,
-                    borderColor: color + '30',
-                }}
+                style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 8, borderColor: color + '30' }}
                 className="items-center justify-center absolute"
             />
             <View
                 style={{
-                    width: size,
-                    height: size,
-                    borderRadius: size / 2,
-                    borderWidth: 8,
-                    borderColor: color,
-                    borderBottomColor: 'transparent',
+                    width: size, height: size, borderRadius: size / 2, borderWidth: 8,
+                    borderColor: color, borderBottomColor: 'transparent',
                     borderRightColor: value > 50 ? color : 'transparent',
                     transform: [{ rotate: `${(value / 100) * 360 - 90}deg` }],
                 }}
@@ -70,11 +62,13 @@ export default function AnalyticsScreen() {
             <ScrollView showsVerticalScrollIndicator={false}>
                 {/* Header */}
                 <View className="px-4 pt-4 pb-4 flex-row items-center">
-                    <TouchableOpacity className="flex-row items-center mr-4" onPress={() => router.back()} activeOpacity={0.7}>
-                        <Text className="text-[#00D4AA] text-lg mr-2">←</Text>
+                    <TouchableOpacity className="flex-row items-center mr-4 gap-1" onPress={() => router.back()} activeOpacity={0.7}>
+                        <Ionicons name="arrow-back" size={20} color="#00D4AA" />
                     </TouchableOpacity>
                     <View>
-                        <Text className="text-white text-2xl font-bold">Civic <Text className="text-[#F59E0B]">Intelligence</Text></Text>
+                        <Text className="text-white text-2xl font-bold">
+                            Civic <Text className="text-[#F59E0B]">Intelligence</Text>
+                        </Text>
                         <Text className="text-[#9CA3AF] text-sm">Bangalore North District · 2025</Text>
                     </View>
                 </View>
@@ -82,12 +76,14 @@ export default function AnalyticsScreen() {
                 {/* Overview cards */}
                 <View className="flex-row px-4 gap-3 mb-4">
                     <View className="flex-1 bg-[#111827] rounded-3xl p-4 items-center border border-[#1F2937]">
-                        <Text className="text-[#00D4AA] text-3xl font-bold">{MOCK_PROJECTS.length}</Text>
+                        <Ionicons name="construct" size={22} color="#00D4AA" />
+                        <Text className="text-[#00D4AA] text-3xl font-bold mt-1">{MOCK_PROJECTS.length}</Text>
                         <Text className="text-[#9CA3AF] text-xs text-center mt-1">Active Projects</Text>
                         <Text className="text-[#4B5563] text-xs">in your area</Text>
                     </View>
                     <View className="flex-1 bg-[#111827] rounded-3xl p-4 items-center border border-[#1F2937]">
-                        <Text className="text-[#F59E0B] text-3xl font-bold">₹1.2k</Text>
+                        <Ionicons name="cash" size={22} color="#F59E0B" />
+                        <Text className="text-[#F59E0B] text-3xl font-bold mt-1">₹1.2k</Text>
                         <Text className="text-[#9CA3AF] text-xs text-center mt-1">Cr Allocated</Text>
                         <Text className="text-[#4B5563] text-xs">district budget</Text>
                     </View>
@@ -95,7 +91,10 @@ export default function AnalyticsScreen() {
 
                 {/* Status breakdown */}
                 <View className="mx-4 mb-4 bg-[#111827] rounded-3xl p-5 border border-[#1F2937]">
-                    <Text className="text-white font-bold text-base mb-4">📊 Project Status</Text>
+                    <View className="flex-row items-center gap-2 mb-4">
+                        <Ionicons name="pie-chart" size={18} color="#fff" />
+                        <Text className="text-white font-bold text-base">Project Status</Text>
+                    </View>
                     <View className="flex-row items-center justify-around">
                         <View className="items-center">
                             <DonutProgress value={Math.round(inProgress / MOCK_PROJECTS.length * 100)} color="#00D4AA" />
@@ -113,8 +112,6 @@ export default function AnalyticsScreen() {
                             <Text className="text-white font-bold">{delayed}</Text>
                         </View>
                     </View>
-
-                    {/* Avg Completion */}
                     <View className="mt-5 pt-4 border-t border-[#1F2937]">
                         <View className="flex-row items-center justify-between mb-2">
                             <Text className="text-[#9CA3AF] text-sm">Average Completion Rate</Text>
@@ -128,7 +125,10 @@ export default function AnalyticsScreen() {
 
                 {/* Projects by category */}
                 <View className="mx-4 mb-4 bg-[#111827] rounded-3xl p-5 border border-[#1F2937]">
-                    <Text className="text-white font-bold text-base mb-2">🏗️ Projects by Category</Text>
+                    <View className="flex-row items-center gap-2 mb-2">
+                        <Ionicons name="bar-chart" size={18} color="#fff" />
+                        <Text className="text-white font-bold text-base">Projects by Category</Text>
+                    </View>
                     <BarChart
                         data={[
                             { label: 'Roads', value: 5, color: '#F59E0B' },
@@ -142,24 +142,21 @@ export default function AnalyticsScreen() {
 
                 {/* Budget breakdown */}
                 <View className="mx-4 mb-4 bg-[#111827] rounded-3xl p-5 border border-[#1F2937]">
-                    <Text className="text-white font-bold text-base mb-4">💰 Budget by Category</Text>
+                    <View className="flex-row items-center gap-2 mb-4">
+                        <Ionicons name="wallet" size={18} color="#fff" />
+                        <Text className="text-white font-bold text-base">Budget by Category</Text>
+                    </View>
                     {CATEGORY_STATS.map(cat => (
                         <View key={cat.category} className="mb-3">
                             <View className="flex-row items-center justify-between mb-1.5">
                                 <View className="flex-row items-center gap-2">
-                                    <Text style={{ fontSize: 14 }}>{cat.icon}</Text>
+                                    <MaterialIcons name={cat.iconName} size={14} color={cat.color} />
                                     <Text className="text-[#9CA3AF] text-sm">{cat.category}</Text>
                                 </View>
                                 <Text style={{ color: cat.color }} className="font-bold text-sm">{cat.budget}</Text>
                             </View>
                             <View className="h-2 bg-[#1F2937] rounded-full overflow-hidden">
-                                <View
-                                    className="h-full rounded-full"
-                                    style={{
-                                        width: `${(parseInt(cat.budget.replace(/[₹,Cr\s]/g, '')) / 940) * 100}%`,
-                                        backgroundColor: cat.color
-                                    }}
-                                />
+                                <View className="h-full rounded-full" style={{ width: `${cat.percent}%`, backgroundColor: cat.color }} />
                             </View>
                         </View>
                     ))}
@@ -167,9 +164,12 @@ export default function AnalyticsScreen() {
 
                 {/* Most delayed */}
                 <View className="mx-4 mb-4 bg-[#EF444415] rounded-3xl p-5 border border-[#EF4444]/20">
-                    <Text className="text-[#EF4444] font-bold text-base mb-3">⚠️ Most Delayed Category</Text>
+                    <View className="flex-row items-center gap-2 mb-3">
+                        <Ionicons name="warning" size={18} color="#EF4444" />
+                        <Text className="text-[#EF4444] font-bold text-base">Most Delayed Category</Text>
+                    </View>
                     <View className="flex-row items-center">
-                        <Text style={{ fontSize: 32 }} className="mr-4">🏥</Text>
+                        <MaterialIcons name="local-hospital" size={32} color="#EF4444" style={{ marginRight: 16 }} />
                         <View>
                             <Text className="text-white font-bold text-base">Healthcare Projects</Text>
                             <Text className="text-[#9CA3AF] text-sm">Avg 4.2 months behind schedule</Text>
@@ -179,7 +179,10 @@ export default function AnalyticsScreen() {
 
                 {/* Insight card */}
                 <View className="mx-4 mb-8 bg-[#00D4AA15] rounded-3xl p-5 border border-[#00D4AA]/20">
-                    <Text className="text-[#00D4AA] font-bold text-base mb-2">💡 Civic Insight</Text>
+                    <View className="flex-row items-center gap-2 mb-2">
+                        <Ionicons name="bulb" size={18} color="#00D4AA" />
+                        <Text className="text-[#00D4AA] font-bold text-base">Civic Insight</Text>
+                    </View>
                     <Text className="text-[#9CA3AF] text-sm leading-6">
                         Your district has ₹1.2k Cr in active infrastructure investment. Metro projects account for 70% of total spending,
                         while road repairs show the fastest completion rates at 93%.

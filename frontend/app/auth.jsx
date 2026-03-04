@@ -1,7 +1,11 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import {
+    View, Text, TextInput, TouchableOpacity,
+    KeyboardAvoidingView, Platform, ScrollView
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 export default function AuthScreen() {
     const router = useRouter();
@@ -10,32 +14,24 @@ export default function AuthScreen() {
     const [otp, setOtp] = useState(['', '', '', '', '', '']);
 
     const handleSendOTP = () => {
-        if (phone.length === 10) {
-            setMode('otp');
-        }
+        if (phone.length === 10) setMode('otp');
     };
 
-    const handleVerify = () => {
-        router.replace('/(tabs)/home');
-    };
-
-    const handleGuest = () => {
-        router.replace('/(tabs)/home');
-    };
+    const handleVerify = () => router.replace('/(tabs)/home');
+    const handleGuest = () => router.replace('/(tabs)/home');
 
     return (
         <SafeAreaView className="flex-1 bg-[#0A0E1A]">
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                className="flex-1"
-            >
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
                 <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
                     <View className="flex-1 px-6 pt-12 pb-8">
                         {/* Header */}
                         <View className="items-center mb-12">
-                            <View className="w-16 h-16 rounded-2xl bg-[#00D4AA] items-center justify-center mb-6"
-                                style={{ shadowColor: '#00D4AA', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 16, elevation: 10 }}>
-                                <Text style={{ fontSize: 28 }}>📍</Text>
+                            <View
+                                className="w-16 h-16 rounded-2xl bg-[#00D4AA] items-center justify-center mb-6"
+                                style={{ shadowColor: '#00D4AA', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 16, elevation: 10 }}
+                            >
+                                <Ionicons name="location" size={28} color="#000" />
                             </View>
                             <Text className="text-white text-2xl font-bold mb-2">
                                 {mode === 'phone' ? 'Welcome to GeoFence' : 'Verify Your Number'}
@@ -53,7 +49,7 @@ export default function AuthScreen() {
                                 <View className="mb-6">
                                     <Text className="text-[#9CA3AF] text-sm font-medium mb-2 ml-1">Mobile Number</Text>
                                     <View className="flex-row items-center bg-[#111827] rounded-2xl border border-[#1F2937] overflow-hidden">
-                                        <View className="px-4 py-4 border-r border-[#1F2937]">
+                                        <View className="px-4 py-4 border-r border-[#1F2937] flex-row items-center gap-2">
                                             <Text className="text-[#9CA3AF] font-semibold text-base">🇮🇳 +91</Text>
                                         </View>
                                         <TextInput
@@ -65,6 +61,11 @@ export default function AuthScreen() {
                                             value={phone}
                                             onChangeText={setPhone}
                                         />
+                                        {phone.length === 10 && (
+                                            <View className="px-4">
+                                                <Ionicons name="checkmark-circle" size={20} color="#00D4AA" />
+                                            </View>
+                                        )}
                                     </View>
                                 </View>
 
@@ -87,24 +88,24 @@ export default function AuthScreen() {
                                     </Text>
                                 </TouchableOpacity>
 
-                                {/* Divider */}
                                 <View className="flex-row items-center mb-4">
                                     <View className="flex-1 h-px bg-[#1F2937]" />
                                     <Text className="text-[#4B5563] mx-4 text-sm">or</Text>
                                     <View className="flex-1 h-px bg-[#1F2937]" />
                                 </View>
 
-                                {/* Google */}
+                                {/* Google button */}
                                 <TouchableOpacity
-                                    className="w-full flex-row items-center justify-center bg-[#111827] rounded-2xl py-4 mb-6 border border-[#1F2937]"
+                                    className="w-full flex-row items-center justify-center bg-[#111827] rounded-2xl py-4 mb-6 border border-[#1F2937] gap-3"
                                     onPress={handleGuest}
                                     activeOpacity={0.85}
                                 >
-                                    <Text style={{ fontSize: 20 }} className="mr-3">🔴</Text>
+                                    <View className="w-5 h-5 rounded-full bg-[#EA4335] items-center justify-center">
+                                        <Text className="text-white font-bold text-xs">G</Text>
+                                    </View>
                                     <Text className="text-white font-semibold text-base">Continue with Google</Text>
                                 </TouchableOpacity>
 
-                                {/* Guest */}
                                 <TouchableOpacity onPress={handleGuest} activeOpacity={0.7} className="items-center">
                                     <Text className="text-[#6B7280] text-sm">
                                         Continue as <Text className="text-[#00D4AA] font-semibold">Guest</Text>
@@ -127,20 +128,20 @@ export default function AuthScreen() {
                                 </View>
 
                                 {/* Keypad */}
-                                {[['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9'], ['←', '0', '✓']].map((row, ri) => (
+                                {[['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9'], ['back', '0', 'verify']].map((row, ri) => (
                                     <View key={ri} className="flex-row justify-between mb-3">
                                         {row.map((key) => (
                                             <TouchableOpacity
                                                 key={key}
                                                 className="flex-1 mx-1 h-14 rounded-2xl items-center justify-center"
-                                                style={{ backgroundColor: key === '✓' ? '#00D4AA' : '#111827' }}
+                                                style={{ backgroundColor: key === 'verify' ? '#00D4AA' : '#111827' }}
                                                 activeOpacity={0.7}
                                                 onPress={() => {
                                                     const newOtp = [...otp];
-                                                    if (key === '←') {
+                                                    if (key === 'back') {
                                                         const lastFilled = newOtp.map((d, i) => d ? i : -1).filter(i => i >= 0).pop();
                                                         if (lastFilled !== undefined) { newOtp[lastFilled] = ''; setOtp(newOtp); }
-                                                    } else if (key === '✓') {
+                                                    } else if (key === 'verify') {
                                                         if (otp.every(d => d)) handleVerify();
                                                     } else {
                                                         const firstEmpty = newOtp.findIndex(d => !d);
@@ -148,14 +149,20 @@ export default function AuthScreen() {
                                                     }
                                                 }}
                                             >
-                                                <Text className={`text-xl font-bold ${key === '✓' ? 'text-black' : 'text-white'}`}>{key}</Text>
+                                                {key === 'back'
+                                                    ? <Ionicons name="backspace-outline" size={22} color="#9CA3AF" />
+                                                    : key === 'verify'
+                                                        ? <Ionicons name="checkmark" size={24} color="#000" />
+                                                        : <Text className="text-xl font-bold text-white">{key}</Text>
+                                                }
                                             </TouchableOpacity>
                                         ))}
                                     </View>
                                 ))}
 
-                                <TouchableOpacity className="items-center mt-4" onPress={() => setMode('phone')} activeOpacity={0.7}>
-                                    <Text className="text-[#6B7280] text-sm">← Change number</Text>
+                                <TouchableOpacity className="items-center mt-4 flex-row justify-center gap-1" onPress={() => setMode('phone')} activeOpacity={0.7}>
+                                    <Ionicons name="arrow-back" size={14} color="#6B7280" />
+                                    <Text className="text-[#6B7280] text-sm">Change number</Text>
                                 </TouchableOpacity>
                             </>
                         )}

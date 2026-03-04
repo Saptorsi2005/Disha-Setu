@@ -1,12 +1,13 @@
 import { Tabs } from 'expo-router';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 const TABS = [
-    { name: 'home', label: 'Home', icon: '🏠' },
-    { name: 'search', label: 'Search', icon: '🔍' },
-    { name: 'notifications', label: 'Alerts', icon: '🔔' },
-    { name: 'activity', label: 'Activity', icon: '📋' },
-    { name: 'settings', label: 'Settings', icon: '⚙️' },
+    { name: 'home', label: 'Home', icon: 'home', iconOutline: 'home-outline' },
+    { name: 'search', label: 'Search', icon: 'search', iconOutline: 'search-outline' },
+    { name: 'notifications', label: 'Alerts', icon: 'notifications', iconOutline: 'notifications-outline' },
+    { name: 'activity', label: 'Activity', icon: 'list', iconOutline: 'list-outline' },
+    { name: 'settings', label: 'Settings', icon: 'settings', iconOutline: 'settings-outline' },
 ];
 
 function CustomTabBar({ state, descriptors, navigation }) {
@@ -24,7 +25,11 @@ function CustomTabBar({ state, descriptors, navigation }) {
                             activeOpacity={0.8}
                         >
                             <View style={[styles.iconContainer, focused && styles.iconContainerActive]}>
-                                <Text style={{ fontSize: 20 }}>{tab.icon}</Text>
+                                <Ionicons
+                                    name={focused ? tab.icon : tab.iconOutline}
+                                    size={22}
+                                    color={focused ? '#00D4AA' : '#4B5563'}
+                                />
                             </View>
                             <Text style={[styles.label, focused && styles.labelActive]}>
                                 {tab.label}
