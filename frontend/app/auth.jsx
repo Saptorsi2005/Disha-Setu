@@ -5,7 +5,7 @@
 import { useState, useEffect } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity,
-    KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Alert
+    KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Alert, Modal
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -29,6 +29,8 @@ export default function AuthScreen() {
     const [phone, setPhone] = useState('');
     const [otp, setOtp] = useState(['', '', '', '', '', '']);
     const [loading, setLoading] = useState(false);
+    const [selectedRole, setSelectedRole] = useState('user');
+    const [showRoleDropdown, setShowRoleDropdown] = useState(false);
     const { isDark } = useColorScheme();
     const iconDim = isDark ? '#9CA3AF' : '#6B7280';
     const bgCard = isDark ? '#111827' : '#FFFFFF';
@@ -113,7 +115,7 @@ export default function AuthScreen() {
         setLoading(true);
         try {
             console.log('Sending idToken to backend...');
-            const data = await loginWithGoogle(idToken);
+            const data = await loginWithGoogle(idToken, selectedRole);
             console.log('Backend response:', data);
             login(data.user);
             router.replace('/(tabs)/home');
@@ -129,7 +131,7 @@ export default function AuthScreen() {
         if (phone.length !== 10) return;
         setLoading(true);
         try {
-            await sendOTP(phone);
+            await sendOTP(phone, selectedRole);
             setMode('otp');
         } catch (err) {
             Alert.alert('Error', err.message || 'Failed to send OTP');
@@ -143,7 +145,7 @@ export default function AuthScreen() {
         if (code.length < 6) return;
         setLoading(true);
         try {
-            const data = await verifyOTP(phone, code);
+            const data = await verifyOTP(phone, code, selectedRole);
             login(data.user);
             router.replace('/(tabs)/home');
         } catch (err) {
@@ -165,7 +167,7 @@ export default function AuthScreen() {
     const handleGuest = async () => {
         setLoading(true);
         try {
-            const data = await loginAsGuest();
+            const data = await loginAsGuest(selectedRole);
             login(data.user);
             router.replace('/(tabs)/home');
         } catch (err) {
@@ -200,6 +202,61 @@ export default function AuthScreen() {
 
                         {mode === 'phone' ? (
                             <>
+                                {/* Role Selector */}
+                                <View className="mb-6">
+                                    <Text className="text-txtMuted text-sm font-medium mb-2 ml-1">Login As</Text>
+                                    <TouchableOpacity
+                                        className="flex-row items-center justify-between bg-card rounded-2xl border border-cardBorder px-4 py-4"
+                                        onPress={() => setShowRoleDropdown(!showRoleDropdown)}
+                                        activeOpacity={0.7}
+                                    >
+                                        <View className="flex-row items-center gap-3">
+                                            <Ionicons 
+                                                name={selectedRole === 'admin' ? 'shield-checkmark' : 'person'} 
+                                                size={20} 
+                                                color={selectedRole === 'admin' ? '#00D4AA' : iconDim} 
+                                            />
+                                            <Text className="text-txt font-semibold text-base">
+                                                {selectedRole === 'admin' ? 'Admin' : 'User'}
+                                            </Text>
+                                        </View>
+                                        <Ionicons name="chevron-down" size={20} color={iconDim} />
+                                    </TouchableOpacity>
+                                    
+                                    {/* Dropdown */}
+                                    {showRoleDropdown && (
+                                        <View className="mt-2 bg-card rounded-2xl border border-cardBorder overflow-hidden">
+                                            <TouchableOpacity
+                                                className="flex-row items-center px-4 py-3 gap-3"
+                                                style={{ backgroundColor: selectedRole === 'user' ? (isDark ? '#1F2937' : '#F3F4F6') : 'transparent' }}
+                                                onPress={() => {
+                                                    setSelectedRole('user');
+                                                    setShowRoleDropdown(false);
+                                                }}
+                                                activeOpacity={0.7}
+                                            >
+                                                <Ionicons name="person" size={20} color={iconDim} />
+                                                <Text className="text-txt font-medium">User</Text>
+                                                {selectedRole === 'user' && <Ionicons name="checkmark" size={20} color="#00D4AA" style={{ marginLeft: 'auto' }} />}
+                                            </TouchableOpacity>
+                                            <View className="h-px bg-cardBorder" />
+                                            <TouchableOpacity
+                                                className="flex-row items-center px-4 py-3 gap-3"
+                                                style={{ backgroundColor: selectedRole === 'admin' ? (isDark ? '#1F2937' : '#F3F4F6') : 'transparent' }}
+                                                onPress={() => {
+                                                    setSelectedRole('admin');
+                                                    setShowRoleDropdown(false);
+                                                }}
+                                                activeOpacity={0.7}
+                                            >
+                                                <Ionicons name="shield-checkmark" size={20} color="#00D4AA" />
+                                                <Text className="text-txt font-medium">Admin</Text>
+                                                {selectedRole === 'admin' && <Ionicons name="checkmark" size={20} color="#00D4AA" style={{ marginLeft: 'auto' }} />}
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
+                                </View>
+
                                 {/* Phone input */}
                                 <View className="mb-6">
                                     <Text className="text-txtMuted text-sm font-medium mb-2 ml-1">Mobile Number</Text>

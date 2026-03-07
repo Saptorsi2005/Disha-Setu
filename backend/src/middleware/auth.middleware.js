@@ -19,7 +19,7 @@ const requireAuth = async (req, res, next) => {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
         // Verify user still exists in DB
-        const result = await query(`SELECT id, phone, name, is_guest FROM users WHERE id = $1`, [decoded.sub]);
+        const result = await query(`SELECT id, phone, name, is_guest, role FROM users WHERE id = $1`, [decoded.sub]);
         if (result.rows.length === 0) {
             return res.status(401).json({ error: 'User not found' });
         }
@@ -45,7 +45,7 @@ const optionalAuth = async (req, res, next) => {
         const token = header.split(' ')[1];
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-        const result = await query(`SELECT id, phone, name, is_guest FROM users WHERE id = $1`, [decoded.sub]);
+        const result = await query(`SELECT id, phone, name, is_guest, role FROM users WHERE id = $1`, [decoded.sub]);
         if (result.rows.length > 0) req.user = result.rows[0];
     } catch (_) {
         // Silently ignore invalid tokens for optional auth

@@ -48,3 +48,6 @@ export const getRoute = async (fromRoomId, toRoomId, accessibleOnly = false) => 
     const data = await apiFetch(url);
     return data;
 };
+
+// Alias for compatibility
+export const getBuildings = fetchBuildings;

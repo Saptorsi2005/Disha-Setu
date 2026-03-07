@@ -22,17 +22,17 @@ export const clearAuth = async () => {
 };
 
 // ── Auth API calls ─────────────────────────────────────────────
-export const sendOTP = async (phone) => {
+export const sendOTP = async (phone, role = 'user') => {
     return apiFetch('/auth/send-otp', {
         method: 'POST',
-        body: JSON.stringify({ phone }),
+        body: JSON.stringify({ phone, role }),
     });
 };
 
-export const verifyOTP = async (phone, otp) => {
+export const verifyOTP = async (phone, otp, role = 'user') => {
     const data = await apiFetch('/auth/verify-otp', {
         method: 'POST',
-        body: JSON.stringify({ phone, otp }),
+        body: JSON.stringify({ phone, otp, role }),
     });
     if (data.token) {
         await saveToken(data.token);
@@ -41,14 +41,14 @@ export const verifyOTP = async (phone, otp) => {
     return data;
 };
 
-export const loginWithGoogle = async (idToken) => {
+export const loginWithGoogle = async (idToken, role = 'user') => {
     console.log('[Auth] loginWithGoogle called with idToken:', idToken ? 'present' : 'MISSING');
     if (!idToken) {
         throw new Error('idToken is required for Google authentication');
     }
     const data = await apiFetch('/auth/google', {
         method: 'POST',
-        body: JSON.stringify({ idToken }),
+        body: JSON.stringify({ idToken, role }),
     });
     console.log('[AuthService] Google login response:', JSON.stringify(data, null, 2));
     console.log('[AuthService] User avatar_url from backend:', data.user?.avatar_url);
@@ -60,8 +60,11 @@ export const loginWithGoogle = async (idToken) => {
     return data;
 };
 
-export const loginAsGuest = async () => {
-    const data = await apiFetch('/auth/guest', { method: 'POST' });
+export const loginAsGuest = async (role = 'user') => {
+    const data = await apiFetch('/auth/guest', { 
+        method: 'POST',
+        body: JSON.stringify({ role })
+    });
     if (data.token) {
         await saveToken(data.token);
         await saveUser(data.user);

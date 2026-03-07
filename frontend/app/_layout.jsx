@@ -31,6 +31,7 @@ function AppShell() {
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="auth" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="admin" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="project/[id]" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="feedback" options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="updates" options={{ animation: 'slide_from_right' }} />

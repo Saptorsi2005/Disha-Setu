@@ -167,6 +167,21 @@ export default function SettingsScreen() {
                     </View>
                 </View>
 
+                {/* Admin Section (only visible to admins) */}
+                {profileData?.role === 'admin' && (
+                    <View className="px-6 mb-8">
+                        <Text className="text-txtMuted text-sm font-semibold mb-3 uppercase tracking-wider ml-2">Administration</Text>
+                        <View className="bg-card rounded-3xl px-5 border border-cardBorder">
+                            <SettingRow
+                                icon="shield-checkmark"
+                                title="Admin Dashboard"
+                                subtitle="Manage feedback, analytics, and navigation"
+                                onPress={() => router.push('/admin')}
+                            />
+                        </View>
+                    </View>
+                )}
+
                 {/* Support & Legal */}
                 <View className="px-6 mb-8">
                     <Text className="text-txtMuted text-sm font-semibold mb-3 uppercase tracking-wider ml-2">Support & Legal</Text>

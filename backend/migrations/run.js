@@ -16,6 +16,8 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const MIGRATIONS = [
     '001_init.sql',
     '002_indoor_navigation.sql',
+    '003_add_admin_role.sql',
+    '004_update_room_types.sql',
 ];
 
 async function run() {

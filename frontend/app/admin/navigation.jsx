@@ -1,0 +1,909 @@
+/**
+ * app/admin/navigation.jsx
+ * Admin Indoor Navigation Management - Full CRUD for rooms and connections
+ */
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl, Alert, Modal, TextInput, Switch, ActivityIndicator } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useState, useEffect, useCallback } from 'react';
+import { useColorScheme } from '../../hooks/use-color-scheme';
+import { useAuth } from '../../context/AuthContext';
+import { getNavigationData, deleteRoom, deleteConnection, addRoom, addConnection } from '../../services/adminService';
+import { getBuildings, fetchBuildingFloors } from '../../services/indoorNavigationService';
+import Ionicons from '@expo/vector-icons/Ionicons';
+
+// Room type options
+const ROOM_TYPES = [
+    'entrance', 'exit', 'reception', 'emergency', 'pharmacy', 'laboratory',
+    'ward', 'icu', 'surgery', 'radiology', 'cafeteria', 'restroom',
+    'elevator', 'stairs', 'corridor', 'room', 'office', 'waiting'
+];
+
+function RoomCard({ room, onDelete }) {
+    const { isDark } = useColorScheme();
+    
+    const handleDelete = () => {
+        Alert.alert(
+            'Delete Room',
+            `Are you sure you want to delete "${room.name}"? All connections will be removed.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await deleteRoom(room.id);
+                            Alert.alert('Success', 'Room deleted successfully');
+                            onDelete();
+                        } catch (err) {
+                            Alert.alert('Error', err.message || 'Failed to delete room');
+                        }
+                    }
+                }
+            ]
+        );
+    };
+    
+    const getTypeIcon = (type) => {
+        const icons = {
+            'entrance': '🚪', 'exit': '🚪', 'reception': '💁', 'emergency': '🚨',
+            'pharmacy': '💊', 'laboratory': '🔬', 'ward': '🛏️', 'icu': '🏥',
+            'surgery': '⚕️', 'radiology': '📷', 'cafeteria': '🍽️', 'restroom': '🚻',
+            'elevator': '🛗', 'stairs': '🪜', 'corridor': '🚶', 'room': '🚪'
+        };
+        return icons[type?.toLowerCase()] || '📍';
+    };
+    
+    return (
+        <View className={`p-4 rounded-xl ${isDark ? 'bg-gray-800' : 'bg-white'} shadow-sm mb-3 border ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+            <View className="flex-row items-start justify-between mb-2">
+                <View className="flex-1 flex-row items-start gap-3">
+                    <Text className="text-2xl">{getTypeIcon(room.type)}</Text>
+                    <View className="flex-1">
+                        <Text className={`font-bold text-base ${isDark ? 'text-white' : 'text-gray-900'} mb-1`}>
+                            {room.name}
+                        </Text>
+                        <View className="flex-row items-center gap-2 mb-1">
+                            <View className={`px-2 py-0.5 rounded ${isDark ? 'bg-blue-900' : 'bg-blue-100'}`}>
+                                <Text className={`text-xs font-medium ${isDark ? 'text-blue-300' : 'text-blue-700'}`}>
+                                    {room.type}
+                                </Text>
+                            </View>
+                            {room.is_landmark && (
+                                <View className={`px-2 py-0.5 rounded ${isDark ? 'bg-yellow-900' : 'bg-yellow-100'}`}>
+                                    <Text className={`text-xs font-medium ${isDark ? 'text-yellow-300' : 'text-yellow-700'}`}>
+                                        ⭐ Landmark
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+                        <Text className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                            📍 Floor {room.floor_number} • {room.building_name}
+                        </Text>
+                        {room.room_number && (
+                            <Text className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-500'} mt-1`}>
+                                Room #{room.room_number}
+                            </Text>
+                        )}
+                    </View>
+                </View>
+                <TouchableOpacity
+                    onPress={handleDelete}
+                    className="bg-red-600 py-2 px-3 rounded-lg"
+                    style={{ elevation: 2 }}
+                >
+                    <Ionicons name="trash-outline" size={16} color="white" />
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
+}
+
+function ConnectionCard({ connection, onDelete }) {
+    const { isDark } = useColorScheme();
+    
+    const handleDelete = () => {
+        Alert.alert(
+            'Delete Connection',
+            `Delete connection between "${connection.from_room_name}" and "${connection.to_room_name}"?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await deleteConnection(connection.id);
+                            Alert.alert('Success', 'Connection deleted successfully');
+                            onDelete();
+                        } catch (err) {
+                            Alert.alert('Error', err.message || 'Failed to delete connection');
+                        }
+                    }
+                }
+            ]
+        );
+    };
+    
+    return (
+        <View className={`p-4 rounded-xl ${isDark ? 'bg-gray-800' : 'bg-white'} shadow-sm mb-3 border ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+            <View className="flex-row items-center justify-between gap-3">
+                <View className="flex-1">
+                    <View className="flex-row items-center gap-2 mb-2">
+                        <View className={`flex-1 ${isDark ? 'bg-gray-700' : 'bg-gray-100'} px-3 py-2 rounded-lg`}>
+                            <Text className={`font-semibold text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                                {connection.from_room_name}
+                            </Text>
+                        </View>
+                        <Ionicons name="arrow-forward" size={16} color={isDark ? '#9CA3AF' : '#6B7280'} />
+                        <View className={`flex-1 ${isDark ? 'bg-gray-700' : 'bg-gray-100'} px-3 py-2 rounded-lg`}>
+                            <Text className={`font-semibold text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                                {connection.to_room_name}
+                            </Text>
+                        </View>
+                    </View>
+                    <View className="flex-row items-center gap-3">
+                        <View className="flex-row items-center gap-1">
+                            <Ionicons name="walk" size={14} color={isDark ? '#9CA3AF' : '#6B7280'} />
+                            <Text className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                                {connection.distance}m
+                            </Text>
+                        </View>
+                        <View className={`px-2 py-0.5 rounded ${connection.is_accessible ? (isDark ? 'bg-green-900' : 'bg-green-100') : (isDark ? 'bg-red-900' : 'bg-red-100')}`}>
+                            <Text className={`text-xs font-medium ${connection.is_accessible ? (isDark ? 'text-green-300' : 'text-green-700') : (isDark ? 'text-red-300' : 'text-red-700')}`}>
+                                {connection.is_accessible ? '♿ Accessible' : '🚫 Not accessible'}
+                            </Text>
+                        </View>
+                        {connection.is_bidirectional && (
+                            <View className={`px-2 py-0.5 rounded ${isDark ? 'bg-blue-900' : 'bg-blue-100'}`}>
+                                <Text className={`text-xs font-medium ${isDark ? 'text-blue-300' : 'text-blue-700'}`}>
+                                    ↔ Bidirectional
+                                </Text>
+                            </View>
+                        )}
+                    </View>
+                </View>
+                <TouchableOpacity
+                    onPress={handleDelete}
+                    className="bg-red-600 py-2 px-3 rounded-lg"
+                    style={{ elevation: 2 }}
+                >
+                    <Ionicons name="trash-outline" size={16} color="white" />
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
+}
+
+// Add Room Modal
+function AddRoomModal({ visible, onClose, onAdd, buildings }) {
+    const { isDark } = useColorScheme();
+    const [loading, setLoading] = useState(false);
+    const [floors, setFloors] = useState([]);
+    const [selectedBuilding, setSelectedBuilding] = useState(null);
+    const [selectedFloor, setSelectedFloor] = useState(null);
+    const [showBuildingPicker, setShowBuildingPicker] = useState(false);
+    const [showFloorPicker, setShowFloorPicker] = useState(false);
+    const [showTypePicker, setShowTypePicker] = useState(false);
+    
+    const [formData, setFormData] = useState({
+        name: '',
+        type: 'room',
+        room_number: '',
+        description: '',
+        is_accessible: true,
+        is_landmark: false,
+    });
+
+    useEffect(() => {
+        if (selectedBuilding) {
+            loadFloors(selectedBuilding.id);
+        }
+    }, [selectedBuilding]);
+
+    const loadFloors = async (buildingId) => {
+        try {
+            const floorsData = await fetchBuildingFloors(buildingId);
+            setFloors(Array.isArray(floorsData) ? floorsData : floorsData.floors || []);
+        } catch (err) {
+            console.error('Failed to load floors:', err);
+            Alert.alert('Error', 'Failed to load floors');
+        }
+    };
+
+    const handleSubmit = async () => {
+        if (!formData.name.trim()) {
+            Alert.alert('Error', 'Room name is required');
+            return;
+        }
+        if (!selectedFloor) {
+            Alert.alert('Error', 'Please select a floor');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            await addRoom({
+                floor_id: selectedFloor.id,
+                name: formData.name,
+                type: formData.type,
+                room_number: formData.room_number || null,
+                description: formData.description || null,
+                is_accessible: formData.is_accessible,
+                is_landmark: formData.is_landmark,
+            });
+            Alert.alert('Success', 'Room added successfully');
+            setFormData({ name: '', type: 'room', room_number: '', description: '', is_accessible: true, is_landmark: false });
+            setSelectedBuilding(null);
+            setSelectedFloor(null);
+            setFloors([]);
+            onAdd();
+            onClose();
+        } catch (err) {
+            Alert.alert('Error', err.message || 'Failed to add room');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Modal visible={visible} animationType="slide" transparent>
+            <View className="flex-1 bg-black/50 justify-end">
+                <View className={`${isDark ? 'bg-gray-900' : 'bg-white'} rounded-t-3xl p-6 max-h-[90%]`}>
+                    <View className="flex-row items-center justify-between mb-6">
+                        <Text className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                            Add New Room
+                        </Text>
+                        <TouchableOpacity onPress={onClose}>
+                            <Ionicons name="close" size={28} color={isDark ? '#FFF' : '#000'} />
+                        </TouchableOpacity>
+                    </View>
+
+                    <ScrollView showsVerticalScrollIndicator={false}>
+                        {/* Building Selector */}
+                        <Text className={`text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                            Building *
+                        </Text>
+                        <TouchableOpacity
+                            onPress={() => setShowBuildingPicker(!showBuildingPicker)}
+                            className={`p-4 rounded-xl mb-4 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-300'} border`}
+                        >
+                            <Text className={selectedBuilding ? (isDark ? 'text-white' : 'text-gray-900') : 'text-gray-500'}>
+                                {selectedBuilding ? selectedBuilding.name : 'Select a building'}
+                            </Text>
+                        </TouchableOpacity>
+                        {showBuildingPicker && (
+                            <View className="mb-4" style={{ maxHeight: 200 }}>
+                                <ScrollView 
+                                    className={`rounded-xl overflow-hidden ${isDark ? 'bg-gray-800' : 'bg-gray-50'}`}
+                                    nestedScrollEnabled={true}
+                                    showsVerticalScrollIndicator={true}
+                                >
+                                    {buildings.map(building => (
+                                        <TouchableOpacity
+                                            key={building.id}
+                                            onPress={() => {
+                                                setSelectedBuilding(building);
+                                                setSelectedFloor(null);
+                                                setShowBuildingPicker(false);
+                                            }}
+                                            className={`p-3 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}
+                                        >
+                                            <Text className={isDark ? 'text-white' : 'text-gray-900'}>
+                                                {building.name}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </View>
+                        )}
+
+                        {/* Floor Selector */}
+                        {selectedBuilding && (
+                            <>
+                                <Text className={`text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                    Floor *
+                                </Text>
+                                <TouchableOpacity
+                                    onPress={() => setShowFloorPicker(!showFloorPicker)}
+                                    className={`p-4 rounded-xl mb-4 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-300'} border`}
+                                >
+                                    <Text className={selectedFloor ? (isDark ? 'text-white' : 'text-gray-900') : 'text-gray-500'}>
+                                        {selectedFloor ? `Floor ${selectedFloor.floor_number} - ${selectedFloor.name}` : 'Select a floor'}
+                                    </Text>
+                                </TouchableOpacity>
+                                {showFloorPicker && (
+                                    <View className="mb-4" style={{ maxHeight: 200 }}>
+                                        <ScrollView 
+                                            className={`rounded-xl overflow-hidden ${isDark ? 'bg-gray-800' : 'bg-gray-50'}`}
+                                            nestedScrollEnabled={true}
+                                            showsVerticalScrollIndicator={true}
+                                        >
+                                        {floors.map(floor => (
+                                            <TouchableOpacity
+                                                key={floor.id}
+                                                onPress={() => {
+                                                    setSelectedFloor(floor);
+                                                    setShowFloorPicker(false);
+                                                }}
+                                                className={`p-3 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}
+                                            >
+                                                <Text className={isDark ? 'text-white' : 'text-gray-900'}>
+                                                    Floor {floor.floor_number} - {floor.name}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                        </ScrollView>
+                                    </View>
+                                )}
+                            </>
+                        )}
+
+                        {/* Room Name */}
+                        <Text className={`text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                            Room Name *
+                        </Text>
+                        <TextInput
+                            value={formData.name}
+                            onChangeText={(text) => setFormData({ ...formData, name: text })}
+                            placeholder="e.g., Emergency Room 101"
+                            placeholderTextColor="#9CA3AF"
+                            className={`p-4 rounded-xl mb-4 ${isDark ? 'bg-gray-800 text-white border-gray-700' : 'bg-gray-50 text-gray-900 border-gray-300'} border`}
+                        />
+
+                        {/* Room Type */}
+                        <Text className={`text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                            Room Type *
+                        </Text>
+                        <TouchableOpacity
+                            onPress={() => setShowTypePicker(!showTypePicker)}
+                            className={`p-4 rounded-xl mb-4 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-300'} border`}
+                        >
+                            <Text className={isDark ? 'text-white' : 'text-gray-900'}>
+                                {formData.type}
+                            </Text>
+                        </TouchableOpacity>
+                        {showTypePicker && (
+                            <View className="mb-4" style={{ maxHeight: 200 }}>
+                                <ScrollView
+                                    className={`rounded-xl ${isDark ? 'bg-gray-800' : 'bg-gray-50'}`}
+                                    nestedScrollEnabled={true}
+                                    showsVerticalScrollIndicator={true}
+                                >
+                                    {ROOM_TYPES.map(type => (
+                                        <TouchableOpacity
+                                            key={type}
+                                            onPress={() => {
+                                                setFormData({ ...formData, type });
+                                                setShowTypePicker(false);
+                                            }}
+                                            className={`p-3 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}
+                                        >
+                                            <Text className={isDark ? 'text-white' : 'text-gray-900'}>
+                                                {type}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </View>
+                        )}
+
+                        {/* Room Number (Optional) */}
+                        <Text className={`text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                            Room Number (Optional)
+                        </Text>
+                        <TextInput
+                            value={formData.room_number}
+                            onChangeText={(text) => setFormData({ ...formData, room_number: text })}
+                            placeholder="e.g., 101, A-23"
+                            placeholderTextColor="#9CA3AF"
+                            className={`p-4 rounded-xl mb-4 ${isDark ? 'bg-gray-800 text-white border-gray-700' : 'bg-gray-50 text-gray-900 border-gray-300'} border`}
+                        />
+
+                        {/* Description (Optional) */}
+                        <Text className={`text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                            Description (Optional)
+                        </Text>
+                        <TextInput
+                            value={formData.description}
+                            onChangeText={(text) => setFormData({ ...formData, description: text })}
+                            placeholder="Brief description"
+                            placeholderTextColor="#9CA3AF"
+                            multiline
+                            numberOfLines={3}
+                            className={`p-4 rounded-xl mb-4 ${isDark ? 'bg-gray-800 text-white border-gray-700' : 'bg-gray-50 text-gray-900 border-gray-300'} border`}
+                            style={{ textAlignVertical: 'top' }}
+                        />
+
+                        {/* Switches */}
+                        <View className="flex-row items-center justify-between mb-4">
+                            <Text className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                Wheelchair Accessible
+                            </Text>
+                            <Switch
+                                value={formData.is_accessible}
+                                onValueChange={(value) => setFormData({ ...formData, is_accessible: value })}
+                            />
+                        </View>
+
+                        <View className="flex-row items-center justify-between mb-6">
+                            <Text className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                Mark as Landmark
+                            </Text>
+                            <Switch
+                                value={formData.is_landmark}
+                                onValueChange={(value) => setFormData({ ...formData, is_landmark: value })}
+                            />
+                        </View>
+
+                        {/* Submit Button */}
+                        <TouchableOpacity
+                            onPress={handleSubmit}
+                            disabled={loading}
+                            className="bg-blue-600 py-4 rounded-xl items-center mb-4"
+                            style={{ elevation: 4 }}
+                        >
+                            {loading ? (
+                                <ActivityIndicator color="white" />
+                            ) : (
+                                <Text className="text-white font-bold text-base">Add Room</Text>
+                            )}
+                        </TouchableOpacity>
+                    </ScrollView>
+                </View>
+            </View>
+        </Modal>
+    );
+}
+
+// Add Connection Modal
+function AddConnectionModal({ visible, onClose, onAdd, rooms }) {
+    const { isDark } = useColorScheme();
+    const [loading, setLoading] = useState(false);
+    const [showFromPicker, setShowFromPicker] = useState(false);
+    const [showToPicker, setShowToPicker] = useState(false);
+    const [fromRoom, setFromRoom] = useState(null);
+    const [toRoom, setToRoom] = useState(null);
+    const [distance, setDistance] = useState('');
+    const [isAccessible, setIsAccessible] = useState(true);
+    const [isBidirectional, setIsBidirectional] = useState(true);
+
+    const handleSubmit = async () => {
+        if (!fromRoom || !toRoom) {
+            Alert.alert('Error', 'Please select both rooms');
+            return;
+        }
+        if (!distance || isNaN(parseFloat(distance))) {
+            Alert.alert('Error', 'Please enter a valid distance');
+            return;
+        }
+        if (fromRoom.id === toRoom.id) {
+            Alert.alert('Error', 'Cannot connect a room to itself');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            await addConnection({
+                from_room: fromRoom.id,
+                to_room: toRoom.id,
+                distance: parseFloat(distance),
+                is_accessible: isAccessible,
+                is_bidirectional: isBidirectional,
+            });
+            Alert.alert('Success', 'Connection added successfully');
+            setFromRoom(null);
+            setToRoom(null);
+            setDistance('');
+            setIsAccessible(true);
+            setIsBidirectional(true);
+            onAdd();
+            onClose();
+        } catch (err) {
+            Alert.alert('Error', err.message || 'Failed to add connection');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Modal visible={visible} animationType="slide" transparent>
+            <View className="flex-1 bg-black/50 justify-end">
+                <View className={`${isDark ? 'bg-gray-900' : 'bg-white'} rounded-t-3xl p-6 max-h-[90%]`}>
+                    <View className="flex-row items-center justify-between mb-6">
+                        <Text className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                            Add New Connection
+                        </Text>
+                        <TouchableOpacity onPress={onClose}>
+                            <Ionicons name="close" size={28} color={isDark ? '#FFF' : '#000'} />
+                        </TouchableOpacity>
+                    </View>
+
+                    <ScrollView showsVerticalScrollIndicator={false}>
+                        {/* From Room */}
+                        <Text className={`text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                            From Room *
+                        </Text>
+                        <TouchableOpacity
+                            onPress={() => setShowFromPicker(!showFromPicker)}
+                            className={`p-4 rounded-xl mb-4 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-300'} border`}
+                        >
+                            <Text className={fromRoom ? (isDark ? 'text-white' : 'text-gray-900') : 'text-gray-500'}>
+                                {fromRoom ? `${fromRoom.name} (Floor ${fromRoom.floor_number})` : 'Select starting room'}
+                            </Text>
+                        </TouchableOpacity>
+                        {showFromPicker && (
+                            <View className="mb-4" style={{ maxHeight: 250 }}>
+                                <ScrollView 
+                                    className={`rounded-xl overflow-hidden ${isDark ? 'bg-gray-800' : 'bg-gray-50'}`}
+                                    nestedScrollEnabled={true}
+                                    showsVerticalScrollIndicator={true}
+                                >
+                                    {rooms.map(room => (
+                                        <TouchableOpacity
+                                            key={room.id}
+                                            onPress={() => {
+                                                setFromRoom(room);
+                                                setShowFromPicker(false);
+                                            }}
+                                            className={`p-3 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}
+                                        >
+                                            <Text className={isDark ? 'text-white font-medium' : 'text-gray-900 font-medium'}>
+                                                {room.name}
+                                            </Text>
+                                            <Text className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                                                Floor {room.floor_number} • {room.building_name}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </View>
+                        )}
+
+                        {/* To Room */}
+                        <Text className={`text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                            To Room *
+                        </Text>
+                        <TouchableOpacity
+                            onPress={() => setShowToPicker(!showToPicker)}
+                            className={`p-4 rounded-xl mb-4 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-300'} border`}
+                        >
+                            <Text className={toRoom ? (isDark ? 'text-white' : 'text-gray-900') : 'text-gray-500'}>
+                                {toRoom ? `${toRoom.name} (Floor ${toRoom.floor_number})` : 'Select destination room'}
+                            </Text>
+                        </TouchableOpacity>
+                        {showToPicker && (
+                            <View className="mb-4" style={{ maxHeight: 250 }}>
+                                <ScrollView 
+                                    className={`rounded-xl overflow-hidden ${isDark ? 'bg-gray-800' : 'bg-gray-50'}`}
+                                    nestedScrollEnabled={true}
+                                    showsVerticalScrollIndicator={true}
+                                >
+                                {rooms.map(room => (
+                                    <TouchableOpacity
+                                        key={room.id}
+                                        onPress={() => {
+                                            setToRoom(room);
+                                            setShowToPicker(false);
+                                        }}
+                                        className={`p-3 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}
+                                    >
+                                        <Text className={isDark ? 'text-white font-medium' : 'text-gray-900 font-medium'}>
+                                            {room.name}
+                                        </Text>
+                                        <Text className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                                            Floor {room.floor_number} • {room.building_name}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                                </ScrollView>
+                            </View>
+                        )}
+
+                        {/* Distance */}
+                        <Text className={`text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                            Distance (meters) *
+                        </Text>
+                        <TextInput
+                            value={distance}
+                            onChangeText={setDistance}
+                            placeholder="e.g., 15"
+                            placeholderTextColor="#9CA3AF"
+                            keyboardType="decimal-pad"
+                            className={`p-4 rounded-xl mb-4 ${isDark ? 'bg-gray-800 text-white border-gray-700' : 'bg-gray-50 text-gray-900 border-gray-300'} border`}
+                        />
+
+                        {/* Switches */}
+                        <View className="flex-row items-center justify-between mb-4">
+                            <Text className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                Wheelchair Accessible
+                            </Text>
+                            <Switch value={isAccessible} onValueChange={setIsAccessible} />
+                        </View>
+
+                        <View className="flex-row items-center justify-between mb-6">
+                            <View className="flex-1 mr-4">
+                                <Text className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                    Bidirectional
+                                </Text>
+                                <Text className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+                                    Can travel in both directions
+                                </Text>
+                            </View>
+                            <Switch value={isBidirectional} onValueChange={setIsBidirectional} />
+                        </View>
+
+                        {/* Submit Button */}
+                        <TouchableOpacity
+                            onPress={handleSubmit}
+                            disabled={loading}
+                            className="bg-blue-600 py-4 rounded-xl items-center mb-4"
+                            style={{ elevation: 4 }}
+                        >
+                            {loading ? (
+                                <ActivityIndicator color="white" />
+                            ) : (
+                                <Text className="text-white font-bold text-base">Add Connection</Text>
+                            )}
+                        </TouchableOpacity>
+                    </ScrollView>
+                </View>
+            </View>
+        </Modal>
+    );
+}
+
+export default function AdminNavigationManagement() {
+    const router = useRouter();
+    const { isDark } = useColorScheme();
+    const { user } = useAuth();
+    
+    const [rooms, setRooms] = useState([]);
+    const [connections, setConnections] = useState([]);
+    const [buildings, setBuildings] = useState([]);
+    const [selectedBuilding, setSelectedBuilding] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [activeTab, setActiveTab] = useState('rooms');
+    const [showAddRoomModal, setShowAddRoomModal] = useState(false);
+    const [showAddConnectionModal, setShowAddConnectionModal] = useState(false);
+    
+    const loadData = useCallback(async () => {
+        try {
+            const [navData, buildingsData] = await Promise.all([
+                getNavigationData(selectedBuilding),
+                getBuildings()
+            ]);
+            
+            console.log('Navigation data:', navData);
+            console.log('Buildings data:', buildingsData);
+            
+            setRooms(navData.rooms || []);
+            setConnections(navData.connections || []);
+            setBuildings(Array.isArray(buildingsData) ? buildingsData : buildingsData.buildings || []);
+        } catch (err) {
+            console.error('Failed to load navigation data:', err);
+            Alert.alert('Error', 'Failed to load navigation data. Please try again.');
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    }, [selectedBuilding]);
+    
+    useEffect(() => {
+        if (user?.role !== 'admin') {
+            router.replace('/');
+            return;
+        }
+        
+        loadData();
+    }, [user, selectedBuilding]);
+    
+    const onRefresh = () => {
+        setRefreshing(true);
+        loadData();
+    };
+    
+    if (loading) {
+        return (
+            <View className={`flex-1 ${isDark ? 'bg-gray-900' : 'bg-gray-50'} items-center justify-center`}>
+                <ActivityIndicator size="large" color="#3B82F6" />
+                <Text className={`mt-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>Loading...</Text>
+            </View>
+        );
+    }
+    
+    return (
+        <View className={`flex-1 ${isDark ? 'bg-gray-900' : 'bg-gray-50'}`}>
+            {/* Header */}
+            <View className={`p-6 ${isDark ? 'bg-gray-800' : 'bg-white'} shadow-sm`} style={{ elevation: 2 }}>
+                <TouchableOpacity 
+                    onPress={() => router.back()} 
+                    className="mb-4 flex-row items-center gap-2"
+                >
+                    <Ionicons name="arrow-back" size={20} color="#3B82F6" />
+                    <Text className="text-blue-500 text-base font-medium">Back to Dashboard</Text>
+                </TouchableOpacity>
+                
+                <Text className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'} mb-2`}>
+                    Indoor Navigation
+                </Text>
+                <View className="flex-row items-center gap-4">
+                    <View className="flex-row items-center gap-2">
+                        <Ionicons name="location" size={18} color={isDark ? '#9CA3AF' : '#6B7280'} />
+                        <Text className={`text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                            {rooms.length} Rooms
+                        </Text>
+                    </View>
+                    <View className="flex-row items-center gap-2">
+                        <Ionicons name="git-network" size={18} color={isDark ? '#9CA3AF' : '#6B7280'} />
+                        <Text className={`text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                            {connections.length} Connections
+                        </Text>
+                    </View>
+                    <View className="flex-row items-center gap-2">
+                        <Ionicons name="business" size={18} color={isDark ? '#9CA3AF' : '#6B7280'} />
+                        <Text className={`text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                            {buildings.length} Buildings
+                        </Text>
+                    </View>
+                </View>
+            </View>
+            
+            {/* Building Filter */}
+            {buildings.length > 0 && (
+                <View className="px-4 py-3">
+                    <Text className={`text-xs font-semibold uppercase mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                        Filter by Building
+                    </Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                        <TouchableOpacity
+                            onPress={() => setSelectedBuilding(null)}
+                            className={`mr-2 py-2.5 px-4 rounded-xl ${
+                                !selectedBuilding ? 'bg-blue-600' : isDark ? 'bg-gray-800' : 'bg-white'
+                            }`}
+                            style={{ elevation: !selectedBuilding ? 4 : 0 }}
+                        >
+                            <View className="flex-row items-center gap-2">
+                                <Ionicons name="apps" size={16} color={!selectedBuilding ? 'white' : (isDark ? '#9CA3AF' : '#6B7280')} />
+                                <Text className={!selectedBuilding ? 'text-white font-semibold' : isDark ? 'text-gray-300' : 'text-gray-700'}>
+                                    All Buildings
+                                </Text>
+                            </View>
+                        </TouchableOpacity>
+                        
+                        {buildings.map(building => (
+                            <TouchableOpacity
+                                key={building.id}
+                                onPress={() => setSelectedBuilding(building.id)}
+                                className={`mr-2 py-2.5 px-4 rounded-xl ${
+                                    selectedBuilding === building.id ? 'bg-blue-600' : isDark ? 'bg-gray-800' : 'bg-white'
+                                }`}
+                                style={{ elevation: selectedBuilding === building.id ? 4 : 0 }}
+                            >
+                                <View className="flex-row items-center gap-2">
+                                    <Ionicons name="business" size={16} color={selectedBuilding === building.id ? 'white' : (isDark ? '#9CA3AF' : '#6B7280')} />
+                                    <Text className={selectedBuilding === building.id ? 'text-white font-semibold' : isDark ? 'text-gray-300' : 'text-gray-700'}>
+                                        {building.name}
+                                    </Text>
+                                </View>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
+            )}
+            
+            {/* Tabs with Add Buttons */}
+            <View className="flex-row px-4 gap-2 mb-3">
+                <TouchableOpacity
+                    onPress={() => setActiveTab('rooms')}
+                    className={`flex-1 py-3 rounded-xl ${
+                        activeTab === 'rooms' ? 'bg-blue-600' : isDark ? 'bg-gray-800' : 'bg-white'
+                    }`}
+                >
+                    <Text className={`text-center font-semibold ${
+                        activeTab === 'rooms' ? 'text-white' : isDark ? 'text-gray-300' : 'text-gray-700'
+                    }`}>
+                        Rooms ({rooms.length})
+                    </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                    onPress={() => setActiveTab('connections')}
+                    className={`flex-1 py-3 rounded-xl ${
+                        activeTab === 'connections' ? 'bg-blue-600' : isDark ? 'bg-gray-800' : 'bg-white'
+                    }`}
+                >
+                    <Text className={`text-center font-semibold ${
+                        activeTab === 'connections' ? 'text-white' : isDark ? 'text-gray-300' : 'text-gray-700'
+                    }`}>
+                        Connections ({connections.length})
+                    </Text>
+                </TouchableOpacity>
+            </View>
+            
+            {/* Add Button in Header */}
+            <View className="px-4 mb-3">
+                <TouchableOpacity
+                    onPress={() => activeTab === 'rooms' ? setShowAddRoomModal(true) : setShowAddConnectionModal(true)}
+                    className="bg-green-600 py-3 px-4 rounded-xl flex-row items-center justify-center gap-2"
+                    style={{ elevation: 4 }}
+                >
+                    <Ionicons name="add-circle" size={20} color="white" />
+                    <Text className="text-white font-bold">
+                        Add {activeTab === 'rooms' ? 'Room' : 'Connection'}
+                    </Text>
+                </TouchableOpacity>
+            </View>
+            
+            {/* Content */}
+            <ScrollView
+                className="flex-1 px-4"
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                }
+            >
+                {activeTab === 'rooms' ? (
+                    rooms.length === 0 ? (
+                        <View className="items-center justify-center py-16">
+                            <Ionicons name="location-outline" size={64} color={isDark ? '#4B5563' : '#D1D5DB'} />
+                            <Text className={`text-lg font-semibold mt-4 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                                No rooms found
+                            </Text>
+                            <Text className={`text-sm mt-2 ${isDark ? 'text-gray-500' : 'text-gray-500'} text-center px-8`}>
+                                {selectedBuilding ? 'Try selecting a different building or add a new room' : 'Add your first room to get started'}
+                            </Text>
+                        </View>
+                    ) : (
+                        <View>
+                            <Text className={`text-xs font-semibold uppercase mb-3 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                                {rooms.length} Room{rooms.length !== 1 ? 's' : ''} Found
+                            </Text>
+                            {rooms.map(room => (
+                                <RoomCard key={room.id} room={room} onDelete={loadData} />
+                            ))}
+                        </View>
+                    )
+                ) : (
+                    connections.length === 0 ? (
+                        <View className="items-center justify-center py-16">
+                            <Ionicons name="git-network-outline" size={64} color={isDark ? '#4B5563' : '#D1D5DB'} />
+                            <Text className={`text-lg font-semibold mt-4 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                                No connections found
+                            </Text>
+                            <Text className={`text-sm mt-2 ${isDark ? 'text-gray-500' : 'text-gray-500'} text-center px-8`}>
+                                {selectedBuilding ? 'Try selecting a different building or add a new connection' : 'Add your first connection to get started'}
+                            </Text>
+                        </View>
+                    ) : (
+                        <View>
+                            <Text className={`text-xs font-semibold uppercase mb-3 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                                {connections.length} Connection{connections.length !== 1 ? 's' : ''} Found
+                            </Text>
+                            {connections.map(connection => (
+                                <ConnectionCard key={connection.id} connection={connection} onDelete={loadData} />
+                            ))}
+                        </View>
+                    )
+                )}
+                
+                <View className="h-20" />
+            </ScrollView>
+            
+            {/* Modals */}
+            <AddRoomModal 
+                visible={showAddRoomModal}
+                onClose={() => setShowAddRoomModal(false)}
+                onAdd={loadData}
+                buildings={buildings}
+            />
+            
+            <AddConnectionModal
+                visible={showAddConnectionModal}
+                onClose={() => setShowAddConnectionModal(false)}
+                onAdd={loadData}
+                rooms={rooms}
+            />
+        </View>
+    );
+}

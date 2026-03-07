@@ -10,18 +10,21 @@ const { v4: uuidv4 } = require('uuid');
 // ── POST /api/auth/send-otp ────────────────────────────────────
 const sendOTP = async (req, res, next) => {
     try {
-        const { phone } = req.body;
+        const { phone, role } = req.body;
         if (!phone || !/^\d{10}$/.test(phone)) {
             return res.status(400).json({ error: 'Valid 10-digit phone number required' });
         }
 
+        // Validate role if provided
+        const userRole = role && ['user', 'admin'].includes(role) ? role : 'user';
+
         const code = await generateOTP(phone);
 
-        // Auto-create user if they don't exist
+        // Auto-create user if they don't exist, with role
         await query(
-            `INSERT INTO users (phone) VALUES ($1)
-             ON CONFLICT (phone) DO NOTHING`,
-            [phone]
+            `INSERT INTO users (phone, role) VALUES ($1, $2)
+             ON CONFLICT (phone) DO UPDATE SET role = EXCLUDED.role`,
+            [phone, userRole]
         );
 
         res.json({
@@ -37,7 +40,7 @@ const sendOTP = async (req, res, next) => {
 // ── POST /api/auth/verify-otp ──────────────────────────────────
 const verifyOTPHandler = async (req, res, next) => {
     try {
-        const { phone, otp } = req.body;
+        const { phone, otp, role } = req.body;
         if (!phone || !otp) {
             return res.status(400).json({ error: 'phone and otp are required' });
         }
@@ -47,11 +50,14 @@ const verifyOTPHandler = async (req, res, next) => {
             return res.status(401).json({ error: 'Invalid or expired OTP' });
         }
 
-        // Get user
+        // Validate role if provided
+        const userRole = role && ['user', 'admin'].includes(role) ? role : 'user';
+
+        // Update user role and get user
         const result = await query(
-            `SELECT id, phone, name, avatar_url, civic_level, civic_points
-             FROM users WHERE phone = $1`,
-            [phone]
+            `UPDATE users SET role = $2 WHERE phone = $1
+             RETURNING id, phone, name, avatar_url, civic_level, civic_points, role`,
+            [phone, userRole]
         );
         const user = result.rows[0];
         const token = signToken(user.id);
@@ -65,7 +71,7 @@ const verifyOTPHandler = async (req, res, next) => {
 // ── POST /api/auth/google ──────────────────────────────────────
 const googleAuth = async (req, res, next) => {
     try {
-        const { idToken } = req.body;
+        const { idToken, role } = req.body;
         if (!idToken) {
             return res.status(400).json({ error: 'idToken required' });
         }
@@ -95,14 +101,17 @@ const googleAuth = async (req, res, next) => {
 
         if (!googleId) return res.status(401).json({ error: 'Invalid Google token' });
 
-        // Upsert user
+        // Validate role if provided
+        const userRole = role && ['user', 'admin'].includes(role) ? role : 'user';
+
+        // Upsert user with role
         const result = await query(
-            `INSERT INTO users (google_id, name, avatar_url)
-             VALUES ($1, $2, $3)
+            `INSERT INTO users (google_id, name, avatar_url, role)
+             VALUES ($1, $2, $3, $4)
              ON CONFLICT (google_id)
-             DO UPDATE SET name = EXCLUDED.name, avatar_url = EXCLUDED.avatar_url, updated_at = NOW()
-             RETURNING id, name, avatar_url, civic_level, civic_points`,
-            [googleId, name, avatar]
+             DO UPDATE SET name = EXCLUDED.name, avatar_url = EXCLUDED.avatar_url, role = EXCLUDED.role, updated_at = NOW()
+             RETURNING id, name, avatar_url, civic_level, civic_points, role`,
+            [googleId, name, avatar, userRole]
         );
 
         const user = result.rows[0];
@@ -117,10 +126,16 @@ const googleAuth = async (req, res, next) => {
 // ── POST /api/auth/guest ───────────────────────────────────────
 const guestAuth = async (req, res, next) => {
     try {
+        const { role } = req.body || {};
+        
+        // Validate role if provided
+        const userRole = role && ['user', 'admin'].includes(role) ? role : 'user';
+        
         const result = await query(
-            `INSERT INTO users (is_guest, name)
-             VALUES (TRUE, 'Guest User')
-             RETURNING id, name, is_guest`,
+            `INSERT INTO users (is_guest, name, role)
+             VALUES (TRUE, 'Guest User', $1)
+             RETURNING id, name, is_guest, role`,
+            [userRole]
         );
         const user = result.rows[0];
         const token = signToken(user.id, true);
@@ -163,7 +178,7 @@ const registerPushToken = async (req, res, next) => {
 const getMe = async (req, res, next) => {
     try {
         const result = await query(
-            `SELECT id, phone, name, avatar_url, civic_level, civic_points, is_guest, created_at
+            `SELECT id, phone, name, avatar_url, civic_level, civic_points, is_guest, role, created_at
              FROM users WHERE id = $1`,
             [req.user.id]
         );

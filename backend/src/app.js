@@ -15,6 +15,7 @@ const feedbackRoutes = require('./routes/feedback.routes');
 const notificationsRoutes = require('./routes/notifications.routes');
 const analyticsRoutes = require('./routes/analytics.routes');
 const indoorNavRoutes = require('./routes/indoor-navigation.routes');
+const adminRoutes = require('./routes/admin.routes');
 
 const app = express();
 
@@ -36,6 +37,9 @@ app.use(cors({
 // ── Body Parsing ───────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// ── Static Files (Admin Panel) ─────────────────────────────────
+app.use('/admin-panel', express.static('public'));
 
 // ── Rate Limiting ──────────────────────────────────────────────
 const limiter = rateLimit({
@@ -64,6 +68,7 @@ app.use('/api/notifications', notificationsRoutes);
 // Project updates are served at /api/projects/:id/updates (nested in projects router)
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api', indoorNavRoutes);  // Indoor navigation routes
+app.use('/api/admin', adminRoutes);  // Admin routes (protected)
 
 // ── 404 Handler ────────────────────────────────────────────────
 app.use((req, res) => {
