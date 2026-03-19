@@ -19,6 +19,7 @@ const getBaseUrl = () => {
 };
 
 export const BASE_URL = getBaseUrl();
+console.log(`[API] Base URL initialized as: ${BASE_URL}`);
 
 /**
  * Authenticated fetch wrapper.

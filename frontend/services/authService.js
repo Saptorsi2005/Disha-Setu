@@ -62,7 +62,7 @@ export const clearAuth = async () => {
 
 // ── Auth API calls ─────────────────────────────────────────────
 export const sendOTP = async (phone, role = 'user') => {
-    return apiFetch('/auth/send-otp', {
+    return await apiFetch('/auth/send-otp', {
         method: 'POST',
         body: JSON.stringify({ phone, role }),
     });

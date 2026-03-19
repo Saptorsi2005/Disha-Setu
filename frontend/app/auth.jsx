@@ -41,8 +41,8 @@ export default function AuthScreen() {
         androidClientId: GOOGLE_CLIENT_ID,
         iosClientId: GOOGLE_CLIENT_ID,
         webClientId: GOOGLE_CLIENT_ID,
-        redirectUri: Platform.OS === 'web' 
-            ? 'http://localhost:8081' 
+        redirectUri: Platform.OS === 'web'
+            ? 'http://localhost:8081'
             : undefined,
     });
 
@@ -51,11 +51,11 @@ export default function AuthScreen() {
         if (response?.type === 'success') {
             console.log('Google OAuth Response:', JSON.stringify(response, null, 2));
             const { authentication, params } = response;
-            
+
             // For web, the structure might be different
             // Try to get idToken from different possible locations
             let idToken = null;
-            
+
             if (authentication?.idToken) {
                 idToken = authentication.idToken;
                 console.log('Found idToken in authentication.idToken');
@@ -69,7 +69,7 @@ export default function AuthScreen() {
                 handleGoogleAccessToken(authentication.accessToken);
                 return;
             }
-            
+
             if (idToken) {
                 console.log('ID Token found, length:', idToken.length);
                 handleGoogleSuccess(idToken);
@@ -94,7 +94,7 @@ export default function AuthScreen() {
             });
             const userInfo = await userInfoResponse.json();
             console.log('Google user info:', userInfo);
-            
+
             // Create a simple token payload (backend will accept this in dev mode)
             const simpleToken = btoa(JSON.stringify({
                 sub: userInfo.sub,
@@ -102,7 +102,7 @@ export default function AuthScreen() {
                 picture: userInfo.picture,
                 email: userInfo.email,
             }));
-            
+
             await handleGoogleSuccess(simpleToken);
         } catch (err) {
             console.error('Error fetching Google user info:', err);
@@ -128,10 +128,18 @@ export default function AuthScreen() {
     };
 
     const handleSendOTP = async () => {
-        if (phone.length !== 10) return;
+        if (phone.length < 10) return; // Basic guard, backend handles strict validation
         setLoading(true);
         try {
-            await sendOTP(phone, selectedRole);
+            const response = await sendOTP(phone, selectedRole);
+            // In development, the backend returns the OTP for testing (only show if not sent via SMS)
+            if (response && response.otp && response.mockMode) {
+                Alert.alert(
+                    'Mock Mode: OTP Received',
+                    `For testing, use code: ${response.otp}\n(SMS not sent via Twilio)`,
+                    [{ text: 'OK' }]
+                );
+            }
             setMode('otp');
         } catch (err) {
             Alert.alert('Error', err.message || 'Failed to send OTP');
@@ -211,10 +219,10 @@ export default function AuthScreen() {
                                         activeOpacity={0.7}
                                     >
                                         <View className="flex-row items-center gap-3">
-                                            <Ionicons 
-                                                name={selectedRole === 'admin' ? 'shield-checkmark' : 'person'} 
-                                                size={20} 
-                                                color={selectedRole === 'admin' ? '#00D4AA' : iconDim} 
+                                            <Ionicons
+                                                name={selectedRole === 'admin' ? 'shield-checkmark' : 'person'}
+                                                size={20}
+                                                color={selectedRole === 'admin' ? '#00D4AA' : iconDim}
                                             />
                                             <Text className="text-txt font-semibold text-base">
                                                 {selectedRole === 'admin' ? 'Admin' : 'User'}
@@ -222,7 +230,7 @@ export default function AuthScreen() {
                                         </View>
                                         <Ionicons name="chevron-down" size={20} color={iconDim} />
                                     </TouchableOpacity>
-                                    
+
                                     {/* Dropdown */}
                                     {showRoleDropdown && (
                                         <View className="mt-2 bg-card rounded-2xl border border-cardBorder overflow-hidden">
@@ -262,18 +270,17 @@ export default function AuthScreen() {
                                     <Text className="text-txtMuted text-sm font-medium mb-2 ml-1">Mobile Number</Text>
                                     <View className="flex-row items-center bg-card rounded-2xl border border-cardBorder overflow-hidden">
                                         <View className="px-4 py-4 border-r border-cardBorder flex-row items-center gap-2">
-                                            <Text className="text-txtMuted font-semibold text-base">🇮🇳 +91</Text>
+                                            <Ionicons name="call-outline" size={20} color={iconDim} />
                                         </View>
                                         <TextInput
                                             className="flex-1 text-txt text-base px-4 py-4"
-                                            placeholder="Enter 10-digit number"
+                                            placeholder="e.g. +1 812 516 5247"
                                             placeholderTextColor="#9CA3AF"
                                             keyboardType="phone-pad"
-                                            maxLength={10}
                                             value={phone}
                                             onChangeText={setPhone}
                                         />
-                                        {phone.length === 10 && (
+                                        {phone.length >= 10 && (
                                             <View className="px-4">
                                                 <Ionicons name="checkmark-circle" size={20} color="#00D4AA" />
                                             </View>
@@ -284,13 +291,13 @@ export default function AuthScreen() {
                                 <TouchableOpacity
                                     className="w-full rounded-2xl py-4 items-center mb-4"
                                     style={{
-                                        backgroundColor: phone.length === 10 ? '#00D4AA' : bgCardBorder,
-                                        shadowColor: phone.length === 10 ? '#00D4AA' : 'transparent',
+                                        backgroundColor: phone.length >= 10 ? '#00D4AA' : bgCardBorder,
+                                        shadowColor: phone.length >= 10 ? '#00D4AA' : 'transparent',
                                         shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 12,
-                                        elevation: phone.length === 10 ? 8 : 0,
+                                        elevation: phone.length >= 10 ? 8 : 0,
                                     }}
                                     onPress={handleSendOTP}
-                                    disabled={phone.length !== 10 || loading}
+                                    disabled={phone.length < 10 || loading}
                                     activeOpacity={0.85}
                                 >
                                     {loading

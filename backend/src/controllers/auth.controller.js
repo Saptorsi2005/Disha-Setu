@@ -11,14 +11,16 @@ const { v4: uuidv4 } = require('uuid');
 const sendOTP = async (req, res, next) => {
     try {
         const { phone, role } = req.body;
-        if (!phone || !/^\d{10}$/.test(phone)) {
-            return res.status(400).json({ error: 'Valid 10-digit phone number required' });
+        // Support international formats: +?[1-9]\d{6,14}
+        if (!phone || !/^\+?[1-9]\d{6,14}$/.test(phone)) {
+            return res.status(400).json({ error: 'Valid phone number required (e.g., +18125165247)' });
         }
 
         // Validate role if provided
         const userRole = role && ['user', 'admin'].includes(role) ? role : 'user';
 
         const code = await generateOTP(phone);
+        console.log(`[Auth] Generating OTP for ${phone} in ${process.env.NODE_ENV} mode`);
 
         // Auto-create user if they don't exist, with role
         await query(
@@ -29,8 +31,9 @@ const sendOTP = async (req, res, next) => {
 
         res.json({
             message: 'OTP sent successfully',
-            // Return OTP in dev only — remove in production!
-            ...(process.env.NODE_ENV === 'development' && { otp: code }),
+            mockMode: !code.sentViaSMS,
+            // Return OTP in dev only AND if not sent via SMS — remove in production!
+            ...((process.env.NODE_ENV === 'development' || !code.sentViaSMS) && { otp: code.code }),
         });
     } catch (err) {
         next(err);
