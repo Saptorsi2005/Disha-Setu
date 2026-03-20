@@ -17,6 +17,10 @@ const analyticsRoutes = require('./routes/analytics.routes');
 const indoorNavRoutes = require('./routes/indoor-navigation.routes');
 const adminRoutes = require('./routes/admin.routes');
 const locationsRoutes = require('./routes/locations.routes');
+const docAnalysisRoutes = require('./routes/document-analysis.routes');
+const roomInsightsRoutes = require('./routes/room-insights.routes');
+const incidentRoutingRoutes = require('./routes/incident-routing.routes');
+
 
 const app = express();
 
@@ -71,6 +75,10 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api', indoorNavRoutes);  // Indoor navigation routes
 app.use('/api/admin', adminRoutes);  // Admin routes (protected)
 app.use('/api/locations', locationsRoutes);  // Dynamic preset locations
+app.use('/api', docAnalysisRoutes);           // Document-aware navigation (extension)
+app.use('/api', roomInsightsRoutes);          // Context-aware room insights
+app.use('/api', incidentRoutingRoutes);       // Dynamic incident-based routing
+
 
 // ── 404 Handler ────────────────────────────────────────────────
 app.use((req, res) => {

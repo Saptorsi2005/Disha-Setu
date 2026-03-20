@@ -378,4 +378,6 @@ module.exports = {
     getBuildingById,
     getFloorById,
     getRoomDetails,
+    generateDirections,
+    dijkstra,
 };

@@ -319,6 +319,7 @@ export default function ProjectDetailScreen() {
                         </View>
                     </View>
 
+
                     {building && (
                         <TouchableOpacity
                             className="bg-[#8B5CF6]/10 border border-[#8B5CF6]/30 rounded-xl py-3 items-center flex-row justify-center gap-2 mb-3"
@@ -329,6 +330,7 @@ export default function ProjectDetailScreen() {
                             <Text className="text-[#8B5CF6] font-semibold text-sm">Indoor Navigation</Text>
                         </TouchableOpacity>
                     )}
+
 
                     <TouchableOpacity
                         className="bg-[#4285F4] rounded-xl py-3 items-center flex-row justify-center gap-2"

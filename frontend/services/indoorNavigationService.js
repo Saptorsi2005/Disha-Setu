@@ -49,5 +49,28 @@ export const getRoute = async (fromRoomId, toRoomId, accessibleOnly = false) => 
     return data;
 };
 
+export const getRoomInsights = async (roomId = null, buildingId = null) => {
+    let url = '/navigation/room-insights';
+    if (roomId) url += `?room_id=${roomId}`;
+    else if (buildingId) url += `?building_id=${buildingId}`;
+    const data = await apiFetch(url);
+    return data;
+};
+
+export const getIncidentRoute = async (fromRoomId, toRoomId, options = {}) => {
+    const { accessible = false, buildingId = null } = options;
+    let url = `/navigation/incident-route?start_room_id=${fromRoomId}&end_room_id=${toRoomId}&accessible=${accessible}`;
+    if (buildingId) url += `&building_id=${buildingId}`;
+    const data = await apiFetch(url);
+    return data;
+};
+
+export const getActiveIncidents = async (buildingId = null) => {
+    let url = '/navigation/incidents';
+    if (buildingId) url += `?building_id=${buildingId}`;
+    const data = await apiFetch(url);
+    return data;
+};
+
 // Alias for compatibility
 export const getBuildings = fetchBuildings;

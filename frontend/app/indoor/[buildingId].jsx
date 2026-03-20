@@ -1,19 +1,23 @@
 /**
  * app/indoor/[buildingId].jsx
- * Indoor navigation and floor map viewer
+ * Indoor navigation and floor map viewer — with Smart Assist tab
  */
-import { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, FlatList } from 'react-native';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, Platform, Animated } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import * as DocumentPicker from 'expo-document-picker';
 import { useColorScheme } from '../../hooks/use-color-scheme';
 import { 
     fetchBuildingById, 
     fetchFloorRooms, 
     searchRooms, 
-    getRoute 
+    getRoute,
+    getRoomInsights,
+    getIncidentRoute,
+    getActiveIncidents,
 } from '../../services/indoorNavigationService';
 
 const ROOM_TYPE_ICONS = {
@@ -125,11 +129,50 @@ function DirectionStep({ step, isLast }) {
     );
 }
 
+const SMART_EXAMPLES = [
+    'Blood test required. OPD consultation. Pharmacy for medication.',
+    'Emergency. Radiology X-Ray. Registration.',
+    'Lab sample collection. Ultrasound. Pharmacy prescription.',
+];
+
+function SmartDirectionStep({ step, isLast }) {
+    const icon = step.roomType === 'elevator' ? 'arrow-up-circle' : step.roomType === 'stairs' ? 'footsteps' : 'arrow-forward';
+    return (
+        <View className="mb-4">
+            <View className="bg-[#1A2035] rounded-2xl p-4 border-l-4 border-[#F59E0B]">
+                <View className="flex-row items-start">
+                    <View className="w-10 h-10 rounded-full bg-[#F59E0B] items-center justify-center mr-3">
+                        <Text className="text-black font-bold">{step.step}</Text>
+                    </View>
+                    <View className="flex-1">
+                        <Text className="text-white font-bold text-base leading-5 mb-1">{step.instruction}</Text>
+                        <View className="flex-row items-center bg-black/30 rounded-lg px-2 py-1 self-start">
+                            <Ionicons name={icon} size={14} color="#F59E0B" />
+                            <Text className="text-[#E5E7EB] text-xs ml-1">{step.roomName}</Text>
+                        </View>
+                    </View>
+                </View>
+            </View>
+            {!isLast && <View className="items-center py-0.5"><Ionicons name="chevron-down" size={18} color="#F59E0B" /></View>}
+        </View>
+    );
+}
+
 export default function IndoorNavigationScreen() {
     const { buildingId } = useLocalSearchParams();
     const router = useRouter();
     const { isDark } = useColorScheme();
-    
+
+    // ── Tab state (NEW) ──────────────────────────────────────
+    const [activeTab, setActiveTab] = useState('navigation'); // 'navigation' | 'smart'
+
+    // ── Smart Assist state (NEW) ─────────────────────────────
+    const [smartText, setSmartText] = useState('');
+    const [smartFile, setSmartFile] = useState(null);
+    const [smartMode, setSmartMode] = useState('input'); // 'input' | 'loading' | 'result'
+    const [smartResult, setSmartResult] = useState(null);
+
+    // ── Existing navigation state (UNCHANGED) ────────────────
     const [building, setBuilding] = useState(null);
     const [selectedFloor, setSelectedFloor] = useState(null);
     const [rooms, setRooms] = useState([]);
@@ -143,6 +186,20 @@ export default function IndoorNavigationScreen() {
     const [endRoom, setEndRoom] = useState(null);
     const [route, setRoute] = useState(null);
     const [accessibleOnly, setAccessibleOnly] = useState(false);
+    
+    // ── Context-Aware Notifications state (NEW) ──────────────
+    const [buildingInsights, setBuildingInsights] = useState({});
+    const [activeInsight, setActiveInsight] = useState(null);
+    const [insightHistory, setInsightHistory] = useState([]);
+    const [currentStepIndex, setCurrentStepIndex] = useState(-1);
+    const [navigating, setNavigating] = useState(false); // Navigation mode
+    const notifAnim = useRef(new Animated.Value(0)).current;
+
+    // ── Incident Routing state (NEW) ──────────────────
+    const [activeIncidents, setActiveIncidents] = useState([]);
+    const [routeAdjusted, setRouteAdjusted] = useState(false);
+    const [routeFallback, setRouteFallback] = useState(false);
+    const [routeIncidents, setRouteIncidents] = useState([]); // incidents affecting the current route
     
     // Load building data
     const loadBuilding = useCallback(async () => {
@@ -161,6 +218,30 @@ export default function IndoorNavigationScreen() {
             Alert.alert('Error', err.message || 'Failed to load building');
         } finally {
             setLoading(false);
+        }
+    }, [buildingId]);
+
+    // Load insights for the building
+    const loadInsights = useCallback(async () => {
+        try {
+            const data = await getRoomInsights(null, buildingId);
+            if (data.success) {
+                setBuildingInsights(data.data);
+            }
+        } catch (err) {
+            console.error('Failed to load insights:', err);
+        }
+    }, [buildingId]);
+
+    // Load active incidents for the building
+    const loadIncidents = useCallback(async () => {
+        try {
+            const data = await getActiveIncidents(buildingId);
+            if (data.success) {
+                setActiveIncidents(data.data || []);
+            }
+        } catch (err) {
+            console.error('Failed to load incidents:', err);
         }
     }, [buildingId]);
     
@@ -219,29 +300,106 @@ export default function IndoorNavigationScreen() {
         }
     };
     
-    // Find route
+    // Find route — uses incident-aware API first, falls back to normal routing
     const findRouteToDestination = async (from, to) => {
         try {
-            const routeData = await getRoute(from.id, to.id, accessibleOnly);
-            
+            let routeData;
+            try {
+                routeData = await getIncidentRoute(from.id, to.id, {
+                    accessible: accessibleOnly,
+                    buildingId,
+                });
+                setRouteAdjusted(routeData.adjusted || false);
+                setRouteFallback(routeData.fallback || false);
+                setRouteIncidents(routeData.incidents || []);
+            } catch {
+                // Fallback to normal routing if incident API unavailable
+                routeData = await getRoute(from.id, to.id, accessibleOnly);
+                setRouteAdjusted(false);
+                setRouteFallback(false);
+                setRouteIncidents([]);
+            }
+
             if (!routeData.found) {
                 Alert.alert('No Route Found', routeData.message || 'Cannot find a path between these locations');
                 setEndRoom(null);
                 return;
             }
-            
+
             setRoute(routeData);
-            Alert.alert(
-                'Route Found',
-                `Distance: ${routeData.distance.toFixed(1)} meters\n${routeData.directions.length} steps`
-            );
+            const alertTitle = routeData.adjusted 
+                ? '⚠️ Route Adjusted' 
+                : (routeData.fallback ? '⚠️ Expected Disruption' : 'Route Found');
+            
+            const alertMsg = routeData.adjusted
+                ? `Alternate route used due to: ${(routeData.incidents || []).map(i => i.type.replace('_', ' ')).join(', ')}\nDistance: ${routeData.distance.toFixed(1)}m`
+                : (routeData.fallback 
+                    ? `Warning: Route includes closed areas because no alternative exists.\n${(routeData.incidents || []).map(i => i.message).join(' | ')}\nDistance: ${routeData.distance.toFixed(1)}m`
+                    : `Distance: ${routeData.distance.toFixed(1)} meters\n${routeData.directions.length} steps`);
+            
+            Alert.alert(alertTitle, alertMsg);
         } catch (err) {
             Alert.alert('Error', err.message || 'Failed to calculate route');
             setEndRoom(null);
         }
     };
+
+    // Handle step arrival (Proximity Trigger)
+    const showInsight = (insight) => {
+        setActiveInsight(insight);
+        notifAnim.setValue(0);
+        Animated.spring(notifAnim, { toValue: 1, useNativeDriver: true, tension: 80, friction: 8 }).start();
+        setTimeout(() => {
+            Animated.timing(notifAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => {
+                setActiveInsight(current => (current?.title === insight.title ? null : current));
+            });
+        }, 6000);
+    };
+
+    const handleStepArrival = (index) => {
+        setCurrentStepIndex(index);
+        const step = route?.directions[index];
+        if (!step) return;
+
+        const roomInsightList = buildingInsights[step.roomId];
+        if (roomInsightList && roomInsightList.length > 0) {
+            const insight = roomInsightList[0];
+            setInsightHistory(prev => {
+                if (prev.find(h => h.title === insight.title)) return prev;
+                return [insight, ...prev];
+            });
+            showInsight(insight);
+        }
+    };
     
-    // Reset navigation
+    // ── Navigation Mode controls (additive, doesn't change routing logic) ──
+    const startNavigating = () => {
+        setNavigating(true);
+        setCurrentStepIndex(0);
+        // Auto-trigger insight for first step
+        if (route?.directions?.[0]) {
+            const insights = buildingInsights[route.directions[0].roomId];
+            if (insights?.length) showInsight(insights[0]);
+        }
+    };
+
+    const goNextStep = () => {
+        const nextIdx = currentStepIndex + 1;
+        if (!route || nextIdx >= route.directions.length) {
+            setNavigating(false);
+            return;
+        }
+        setCurrentStepIndex(nextIdx);
+        const insights = buildingInsights[route.directions[nextIdx].roomId];
+        if (insights?.length) {
+            const insight = insights[0];
+            setInsightHistory(prev => prev.find(h => h.title === insight.title) ? prev : [insight, ...prev]);
+            showInsight(insight);
+        }
+    };
+
+    const stopNavigating = () => { setNavigating(false); setCurrentStepIndex(-1); setActiveInsight(null); };
+
     const resetNavigation = () => {
         setStartRoom(null);
         setEndRoom(null);
@@ -249,11 +407,69 @@ export default function IndoorNavigationScreen() {
         setSearchQuery('');
         setSearchMode(false);
         setSearchResults([]);
+        setRouteAdjusted(false);
+        setRouteFallback(false);
+        setRouteIncidents([]);
+        setNavigating(false);
+        setCurrentStepIndex(-1);
     };
     
+    // ── Smart Assist handlers (NEW) ─────────────────────────
+    const pickSmartDocument = async () => {
+        try {
+            const res = await DocumentPicker.getDocumentAsync({
+                type: ['application/pdf', 'text/plain', 'image/*'],
+                copyToCacheDirectory: false,
+            });
+            if (!res.canceled && res.assets?.length) {
+                setSmartFile(res.assets[0]);
+                setSmartText('');
+            }
+        } catch {
+            Alert.alert('Error', 'Could not open document picker.');
+        }
+    };
+
+    const runSmartAnalysis = useCallback(async () => {
+        if (!smartText.trim() && !smartFile) {
+            Alert.alert('Input required', 'Type a description or upload a document.');
+            return;
+        }
+        setSmartMode('loading');
+        try {
+            const apiBase = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+            const formData = new FormData();
+            formData.append('building_id', buildingId);
+            if (smartFile) {
+                if (Platform.OS === 'web' && smartFile.file instanceof File) {
+                    formData.append('file', smartFile.file, smartFile.name);
+                } else if (Platform.OS === 'web' && smartFile.uri?.startsWith('blob:')) {
+                    const blobRes = await fetch(smartFile.uri);
+                    const blob = await blobRes.blob();
+                    formData.append('file', new File([blob], smartFile.name, { type: smartFile.mimeType || blob.type || 'text/plain' }));
+                } else {
+                    formData.append('file', { uri: smartFile.uri, name: smartFile.name, type: smartFile.mimeType || 'application/pdf' });
+                }
+            } else {
+                formData.append('text', smartText);
+            }
+            const response = await fetch(`${apiBase}/api/navigation/analyze-document`, { method: 'POST', body: formData });
+            const data = await response.json();
+            if (response.ok) { setSmartResult(data); setSmartMode('result'); }
+            else throw new Error(data.error || 'Analysis failed');
+        } catch (err) {
+            Alert.alert('Error', err.message || 'Could not analyze document.');
+            setSmartMode('input');
+        }
+    }, [smartText, smartFile, buildingId]);
+
+    const resetSmart = () => { setSmartMode('input'); setSmartResult(null); setSmartText(''); setSmartFile(null); };
+
     useEffect(() => {
         loadBuilding();
-    }, [loadBuilding]);
+        loadInsights();
+        loadIncidents();
+    }, [loadBuilding, loadInsights, loadIncidents]);
     
     if (loading) {
         return (
@@ -279,10 +495,10 @@ export default function IndoorNavigationScreen() {
     return (
         <SafeAreaView className="flex-1 bg-bg">
             {/* Header */}
-            <View className="px-5 py-4 border-b border-cardBorder">
+            <View className="px-5 pt-4 border-b border-cardBorder">
                 <View className="flex-row items-center mb-3">
                     <TouchableOpacity onPress={() => router.back()} className="mr-3">
-                        <Ionicons name="arrow-back" size={24} color="#00D4AA" />
+                        <Ionicons name="arrow-back" size={24} color={activeTab === 'smart' ? '#F59E0B' : '#00D4AA'} />
                     </TouchableOpacity>
                     <View className="flex-1">
                         <Text className="text-txt text-xl font-bold">{building.name}</Text>
@@ -290,10 +506,86 @@ export default function IndoorNavigationScreen() {
                             <Text className="text-txtMuted text-sm">{building.campus}</Text>
                         )}
                     </View>
+                    {activeTab === 'smart' && smartMode === 'result' && (
+                        <TouchableOpacity onPress={resetSmart} className="bg-[#1F2937] px-3 py-1 rounded-full">
+                            <Text className="text-[#9CA3AF] text-xs font-bold">Reset</Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
+
+                {/* ── Tab Bar (NEW) ── */}
+                <View className="flex-row mb-1 bg-[#1A2035] rounded-2xl p-1">
+                    <TouchableOpacity
+                        onPress={() => setActiveTab('navigation')}
+                        className={`flex-1 py-2.5 rounded-xl flex-row items-center justify-center gap-1 ${
+                            activeTab === 'navigation' ? 'bg-[#00D4AA]' : ''
+                        }`}
+                    >
+                        <Ionicons name="map-outline" size={16} color={activeTab === 'navigation' ? '#0A0F1E' : '#9CA3AF'} />
+                        <Text className={`font-bold text-sm ${
+                            activeTab === 'navigation' ? 'text-[#0A0F1E]' : 'text-[#9CA3AF]'
+                        }`}>Navigation</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        onPress={() => setActiveTab('smart')}
+                        className={`flex-1 py-2.5 rounded-xl flex-row items-center justify-center gap-1 ${
+                            activeTab === 'smart' ? 'bg-[#F59E0B]' : ''
+                        }`}
+                    >
+                        <Ionicons name="sparkles-outline" size={16} color={activeTab === 'smart' ? '#0A0F1E' : '#9CA3AF'} />
+                        <Text className={`font-bold text-sm ${
+                            activeTab === 'smart' ? 'text-[#0A0F1E]' : 'text-[#9CA3AF]'
+                        }`}>Smart Assist</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {/* ── Incident Alert Banner (non-blocking) ── */}
+                {(activeIncidents.length > 0 || routeAdjusted || routeFallback) && (
+                    <View
+                        className="mt-2 mb-1 rounded-2xl px-4 py-3 flex-row items-center"
+                        style={{
+                            backgroundColor: (routeAdjusted || routeFallback) ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.12)',
+                            borderWidth: 1,
+                            borderColor: (routeAdjusted || routeFallback) ? '#EF4444' : '#F59E0B',
+                        }}
+                    >
+                        <Ionicons
+                            name={(routeAdjusted || routeFallback) ? 'warning' : 'alert-circle-outline'}
+                            size={18}
+                            color={(routeAdjusted || routeFallback) ? '#EF4444' : '#F59E0B'}
+                        />
+                        <View className="flex-1 ml-3">
+                            {(routeAdjusted || routeFallback) ? (
+                                <>
+                                    <Text style={{ color: '#EF4444', fontWeight: '800', fontSize: 13 }}>
+                                        {routeFallback ? '⚠️ Route Affected by Incident' : 'Route Adjusted'}
+                                    </Text>
+                                    <Text style={{ color: '#9CA3AF', fontSize: 11, marginTop: 1 }}>
+                                        {routeIncidents.map(i => i.message).join(' • ')}
+                                    </Text>
+                                </>
+                            ) : (
+                                <>
+                                    <Text style={{ color: '#F59E0B', fontWeight: '800', fontSize: 13 }}>
+                                        {activeIncidents.length} Active Incident{activeIncidents.length !== 1 ? 's' : ''}
+                                    </Text>
+                                    <Text style={{ color: '#9CA3AF', fontSize: 11, marginTop: 1 }}>
+                                        {activeIncidents[0]?.message}
+                                    </Text>
+                                </>
+                            )}
+                        </View>
+                        <TouchableOpacity onPress={() => setActiveTab('smart')} style={{ marginLeft: 8 }}>
+                            <Text style={{ color: '#9CA3AF', fontSize: 11, fontWeight: '700' }}>Details</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+
+                {/* ── Navigation tab: Search + Route Controls ── */}
+                {activeTab === 'navigation' && (<>
                 
                 {/* Search Bar */}
-                <View className="bg-surface rounded-xl px-4 py-3 flex-row items-center border border-cardBorder">
+                <View className="bg-surface rounded-xl px-4 py-3 flex-row items-center border border-cardBorder mt-2">
                     <Ionicons name="search" size={20} color="#9CA3AF" />
                     <TextInput
                         className="flex-1 ml-3 text-white"
@@ -308,7 +600,7 @@ export default function IndoorNavigationScreen() {
                         </TouchableOpacity>
                     )}
                 </View>
-                
+
                 {/* Navigation Controls */}
                 {(startRoom || endRoom) && (
                     <View className="mt-3 bg-[#00D4AA]/20 rounded-2xl p-4 border-2 border-[#00D4AA]">
@@ -319,10 +611,7 @@ export default function IndoorNavigationScreen() {
                                     {!startRoom ? 'Select Start' : !endRoom ? 'Select Destination' : 'Route Found'}
                                 </Text>
                             </View>
-                            <TouchableOpacity 
-                                onPress={resetNavigation}
-                                className="bg-[#EF4444] px-3 py-1.5 rounded-lg"
-                            >
+                            <TouchableOpacity onPress={resetNavigation} className="bg-[#EF4444] px-3 py-1.5 rounded-lg">
                                 <Text className="text-white font-bold text-xs">Reset</Text>
                             </TouchableOpacity>
                         </View>
@@ -340,27 +629,26 @@ export default function IndoorNavigationScreen() {
                         )}
                     </View>
                 )}
+                </>)}
             </View>
             
-            {/* Floor Selector */}
-            {!searchMode && building.floors && building.floors.length > 0 && (
+            {/* Floor Selector — Navigation tab only */}
+            {activeTab === 'navigation' && !searchMode && building.floors && building.floors.length > 0 && (
                 <View className="bg-[#0A0F1E] border-b-2 border-[#2D3548]">
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} className="px-5 py-4">
+                    <Text className="text-[#6B7280] text-xs font-semibold uppercase tracking-wider px-5 pt-3">Select Floor</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} className="px-5 py-3">
                         {building.floors.map((floor) => (
                             <TouchableOpacity
                                 key={floor.id}
                                 onPress={() => changeFloor(floor)}
                                 className={`px-6 py-3 rounded-2xl mr-3 ${
-                                    selectedFloor?.id === floor.id 
-                                        ? 'bg-[#00D4AA]' 
+                                    selectedFloor?.id === floor.id
+                                        ? 'bg-[#00D4AA]'
                                         : 'bg-[#1A2035] border-2 border-[#2D3548]'
                                 }`}
                                 style={selectedFloor?.id === floor.id ? {
-                                    shadowColor: '#00D4AA',
-                                    shadowOffset: { width: 0, height: 2 },
-                                    shadowOpacity: 0.5,
-                                    shadowRadius: 8,
-                                    elevation: 5
+                                    shadowColor: '#00D4AA', shadowOffset: { width: 0, height: 2 },
+                                    shadowOpacity: 0.5, shadowRadius: 8, elevation: 5
                                 } : {}}
                             >
                                 <Text className={`font-bold text-base ${
@@ -374,80 +662,421 @@ export default function IndoorNavigationScreen() {
                 </View>
             )}
             
-            {/* Content */}
-            <ScrollView className="flex-1 px-5 py-4">
-                {route ? (
-                    // Show Directions
-                    <View>
-                        <View className="bg-gradient-to-r from-[#00D4AA]/20 to-[#00D4AA]/10 rounded-2xl p-5 mb-5 border-2 border-[#00D4AA]/30">
-                            <View className="flex-row items-center justify-between">
-                                <View className="flex-1">
-                                    <Text className="text-[#00D4AA] text-sm font-bold uppercase tracking-wider mb-1">Turn-by-Turn</Text>
-                                    <Text className="text-white text-2xl font-bold">Directions</Text>
-                                </View>
-                                <View className="items-end">
-                                    <View className="bg-[#00D4AA] px-4 py-2.5 rounded-full">
-                                        <Text className="text-[#0A0F1E] font-bold text-lg">
-                                            {route.distance.toFixed(0)}m
-                                        </Text>
+            {/* ════════ TAB CONTENT ════════ */}
+
+            {/* ── NAVIGATION TAB (existing UI, fully intact) ── */}
+            {activeTab === 'navigation' && (
+                <ScrollView className="flex-1 px-5 py-4">
+                    {route ? (
+                        <View>
+                            <View className="bg-[#1A2035] rounded-2xl p-5 mb-5 border-2 border-[#00D4AA]/30">
+                                <View className="flex-row items-center justify-between">
+                                    <View className="flex-1">
+                                        <Text className="text-[#00D4AA] text-sm font-bold uppercase tracking-wider mb-1">Turn-by-Turn</Text>
+                                        <Text className="text-white text-2xl font-bold">Directions</Text>
                                     </View>
-                                    <Text className="text-[#9CA3AF] text-xs mt-1">Total Distance</Text>
+                                    <View className="items-end">
+                                        <View className="bg-[#00D4AA] px-4 py-2.5 rounded-full">
+                                            <Text className="text-[#0A0F1E] font-bold text-lg">{route.distance.toFixed(0)}m</Text>
+                                        </View>
+                                        <Text className="text-[#9CA3AF] text-xs mt-1">Total Distance</Text>
+                                    </View>
+                                </View>
+                            </View>
+
+                            {/* ── Navigation Mode Controls ─────────────────── */}
+                            {!navigating ? (
+                                <TouchableOpacity
+                                    onPress={startNavigating}
+                                    className="mb-5 bg-[#00D4AA] rounded-2xl py-3 flex-row items-center justify-center"
+                                    style={{ shadowColor: '#00D4AA', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 4 }}
+                                >
+                                    <Ionicons name="navigate" size={18} color="#0A0F1E" />
+                                    <Text className="text-[#0A0F1E] font-bold text-base ml-2">▶ Start Navigation</Text>
+                                </TouchableOpacity>
+                            ) : (
+                                <View className="flex-row mb-5" style={{ gap: 10 }}>
+                                    <TouchableOpacity
+                                        onPress={stopNavigating}
+                                        className="flex-1 bg-[#1F2937] border border-[#374151] rounded-2xl py-3 items-center"
+                                    >
+                                        <Text className="text-[#9CA3AF] font-bold text-sm">✕ Stop</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        onPress={goNextStep}
+                                        className="flex-[2] bg-[#00D4AA] rounded-2xl py-3 items-center"
+                                        style={{ shadowColor: '#00D4AA', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 4 }}
+                                    >
+                                        <Text className="text-[#0A0F1E] font-bold text-base">
+                                            {currentStepIndex >= route.directions.length - 1 ? '✓ Arrived!' : 'Next Step →'}
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+
+                            {/* Direction steps */}
+                            {route.directions.map((step, idx) => (
+                                <TouchableOpacity 
+                                    key={idx} 
+                                    onPress={() => handleStepArrival(idx)}
+                                    activeOpacity={0.9}
+                                >
+                                    <View style={{ opacity: navigating ? (idx === currentStepIndex ? 1 : 0.3) : (currentStepIndex === -1 ? 1 : currentStepIndex === idx ? 1 : 0.6) }}>
+                                        <DirectionStep step={step} isLast={idx === route.directions.length - 1} />
+                                    </View>
+                                </TouchableOpacity>
+                            ))}
+                            <View className="bg-[#10B981]/20 rounded-2xl p-4 border-2 border-[#10B981] mt-4">
+                                <View className="flex-row items-center justify-center">
+                                    <Ionicons name="checkmark-circle" size={24} color="#10B981" />
+                                    <Text className="text-[#10B981] font-bold text-lg ml-2">You have arrived!</Text>
                                 </View>
                             </View>
                         </View>
-                        
-                        {route.directions.map((step, idx) => (
-                            <DirectionStep 
-                                key={idx} 
-                                step={step} 
-                                isLast={idx === route.directions.length - 1}
+                    ) : searchMode && searchResults.length > 0 ? (
+                        <View>
+                            <Text className="text-txtMuted text-sm mb-3">
+                                {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} found
+                            </Text>
+                            {searchResults.map((room) => (
+                                <RoomCard key={room.id} room={room} onPress={selectRoom}
+                                    isSelected={startRoom?.id === room.id || endRoom?.id === room.id} />
+                            ))}
+                        </View>
+                    ) : searchMode ? (
+                        <View className="items-center justify-center py-12">
+                            <Ionicons name="search-outline" size={48} color="#6B7280" />
+                            <Text className="text-txtMuted mt-4">No results found</Text>
+                        </View>
+                    ) : (
+                        <View>
+                            <Text className="text-txtMuted text-sm mb-3">
+                                {rooms.length} room{rooms.length !== 1 ? 's' : ''} on this floor
+                            </Text>
+                            {rooms.map((room) => (
+                                <RoomCard key={room.id} room={room} onPress={selectRoom}
+                                    isSelected={startRoom?.id === room.id || endRoom?.id === room.id} />
+                            ))}
+                        </View>
+                    )}
+                </ScrollView>
+            )}
+
+            {/* ── SMART ASSIST TAB (NEW) ── */}
+            {activeTab === 'smart' && (
+                <ScrollView className="flex-1 px-5 py-4" showsVerticalScrollIndicator={false}>
+
+                    {/* Incident List — shown at top of Smart Assist tab */}
+                    {activeIncidents.length > 0 && (
+                        <View className="mb-5">
+                            <View className="flex-row items-center mb-3">
+                                <Ionicons name="warning" size={16} color="#EF4444" />
+                                <Text className="text-[#EF4444] font-bold text-sm ml-2 uppercase tracking-wider">Active Incidents</Text>
+                            </View>
+                            {activeIncidents.map((inc, idx) => (
+                                <View
+                                    key={idx}
+                                    className="rounded-2xl p-4 mb-2 flex-row items-start"
+                                    style={{
+                                        backgroundColor: inc.severity === 'high' ? 'rgba(239,68,68,0.12)' : inc.severity === 'medium' ? 'rgba(245,158,11,0.1)' : 'rgba(107,114,128,0.1)',
+                                        borderLeftWidth: 4,
+                                        borderLeftColor: inc.severity === 'high' ? '#EF4444' : inc.severity === 'medium' ? '#F59E0B' : '#6B7280',
+                                    }}
+                                >
+                                    <Ionicons
+                                        name={inc.type === 'lift_down' ? 'arrow-up-circle' : inc.type === 'room_closed' ? 'lock-closed' : inc.type === 'blocked_path' ? 'close-circle' : 'construct'}
+                                        size={20}
+                                        color={inc.severity === 'high' ? '#EF4444' : '#F59E0B'}
+                                        style={{ marginTop: 1 }}
+                                    />
+                                    <View className="flex-1 ml-3">
+                                        <Text style={{ color: 'white', fontWeight: '700', fontSize: 13 }}>
+                                            {inc.type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                                            {inc.room_name ? ` — ${inc.room_name}` : ''}
+                                        </Text>
+                                        <Text style={{ color: '#9CA3AF', fontSize: 12, marginTop: 2 }}>{inc.message}</Text>
+                                        <View style={{ flexDirection: 'row', marginTop: 4 }}>
+                                            <View style={{ backgroundColor: inc.severity === 'high' ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.2)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                                                <Text style={{ color: inc.severity === 'high' ? '#EF4444' : '#F59E0B', fontSize: 10, fontWeight: '700', textTransform: 'uppercase' }}>{inc.severity} severity</Text>
+                                            </View>
+                                        </View>
+                                    </View>
+                                </View>
+                            ))}
+                        </View>
+                    )}
+
+                    {smartMode === 'input' && (
+                        <View>
+                            {/* Info Banner */}
+                            <View className="bg-[#F59E0B]/10 border border-[#F59E0B]/30 rounded-2xl p-4 mb-5 flex-row items-start">
+                                <Ionicons name="document-text-outline" size={20} color="#F59E0B" style={{ marginRight: 10, marginTop: 1 }} />
+                                <Text className="text-[#FDE68A] text-sm flex-1 leading-5">
+                                    Describe your visit or upload a prescription / token — we'll auto-generate your navigation route.
+                                </Text>
+                            </View>
+
+                            {/* Text Input */}
+                            <Text className="text-white font-bold mb-2">Describe your needs</Text>
+                            <TextInput
+                                className="bg-[#1A2035] border border-[#2D3548] rounded-2xl p-4 text-white mb-4"
+                                style={{ minHeight: 100, textAlignVertical: 'top' }}
+                                placeholder="e.g. Blood test required. OPD consultation. Need pharmacy."
+                                placeholderTextColor="#4B5563"
+                                multiline
+                                value={smartText}
+                                onChangeText={setSmartText}
                             />
-                        ))}
-                        
-                        <View className="bg-[#10B981]/20 rounded-2xl p-4 border-2 border-[#10B981] mt-4">
-                            <View className="flex-row items-center justify-center">
-                                <Ionicons name="checkmark-circle" size={24} color="#10B981" />
-                                <Text className="text-[#10B981] font-bold text-lg ml-2">You have arrived!</Text>
+
+                            {/* Example Chips */}
+                            <Text className="text-[#6B7280] text-xs mb-2">Try an example:</Text>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-5">
+                                {SMART_EXAMPLES.map((ex, i) => (
+                                    <TouchableOpacity
+                                        key={i}
+                                        onPress={() => { setSmartText(ex); setSmartFile(null); }}
+                                        className="bg-[#1A2035] border border-[#2D3548] rounded-xl px-3 py-2 mr-2"
+                                        style={{ maxWidth: 200 }}
+                                    >
+                                        <Text className="text-[#9CA3AF] text-xs" numberOfLines={2}>{ex}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+
+                            {/* Divider */}
+                            <View className="flex-row items-center mb-5">
+                                <View className="flex-1 h-px bg-[#1F2937]" />
+                                <Text className="text-[#4B5563] mx-3 text-xs">OR</Text>
+                                <View className="flex-1 h-px bg-[#1F2937]" />
+                            </View>
+
+                            {/* Upload Area */}
+                            <TouchableOpacity
+                                onPress={pickSmartDocument}
+                                className="bg-[#1A2035] border-2 border-dashed border-[#2D3548] rounded-2xl p-6 items-center mb-5"
+                            >
+                                <Ionicons name="cloud-upload-outline" size={36} color={smartFile ? '#F59E0B' : '#4B5563'} />
+                                <Text className="text-white font-semibold mt-2">
+                                    {smartFile ? smartFile.name : 'Upload Prescription / Token'}
+                                </Text>
+                                <Text className="text-[#6B7280] text-xs mt-1">PDF, TXT, or Image (max 5MB)</Text>
+                            </TouchableOpacity>
+
+                            {/* Generate Button */}
+                            <TouchableOpacity
+                                onPress={runSmartAnalysis}
+                                className="bg-[#F59E0B] rounded-2xl py-4 items-center flex-row justify-center gap-2"
+                                style={{ shadowColor: '#F59E0B', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 10, elevation: 6 }}
+                                activeOpacity={0.85}
+                            >
+                                <Ionicons name="sparkles-outline" size={20} color="#000" />
+                                <Text className="text-black font-bold text-base">Generate My Route</Text>
+                            </TouchableOpacity>
+
+                            <View className="flex-row items-center justify-center mt-4">
+                                <Ionicons name="shield-checkmark-outline" size={12} color="#4B5563" />
+                                <Text className="text-[#4B5563] text-xs ml-1">Documents are never stored. Analysis is temporary.</Text>
                             </View>
                         </View>
+                    )}
+
+                    {smartMode === 'loading' && (
+                        <View className="items-center py-20">
+                            <View className="w-20 h-20 rounded-full bg-[#F59E0B]/10 items-center justify-center mb-4">
+                                <ActivityIndicator size="large" color="#F59E0B" />
+                            </View>
+                            <Text className="text-white font-bold text-lg">Analyzing Document...</Text>
+                            <Text className="text-[#9CA3AF] text-sm mt-1">Extracting intents & building your route</Text>
+                        </View>
+                    )}
+
+                    {smartMode === 'result' && smartResult && (
+                        <View>
+                            {smartResult.found ? (
+                                <>
+                                    {/* Intents */}
+                                    {smartResult.intents?.length > 0 && (
+                                        <View className="bg-[#1A2035] rounded-2xl p-4 mb-4 border border-[#2D3548]">
+                                            <View className="flex-row items-center mb-2">
+                                                <Ionicons name="sparkles" size={16} color="#F59E0B" />
+                                                <Text className="text-[#F59E0B] font-bold text-sm ml-2 uppercase tracking-wider">Detected Needs</Text>
+                                            </View>
+                                            <View className="flex-row flex-wrap">
+                                                {smartResult.intents.map((intent, i) => (
+                                                    <View key={i} className="bg-[#F59E0B]/15 px-3 py-1 rounded-full mr-2 mb-2">
+                                                        <Text className="text-[#FDE68A] text-xs font-semibold capitalize">{intent}</Text>
+                                                    </View>
+                                                ))}
+                                            </View>
+                                        </View>
+                                    )}
+
+                                    {/* Visit Order */}
+                                    {smartResult.steps?.length > 0 && (
+                                        <View className="mb-4">
+                                            <Text className="text-[#9CA3AF] text-xs font-semibold uppercase tracking-wider mb-2">Your Visit Order</Text>
+                                            <View className="flex-row flex-wrap">
+                                                {smartResult.steps.map((step, i) => (
+                                                    <View key={i} className="flex-row items-center bg-[#1A2035] rounded-full px-3 py-1.5 mr-2 mb-2 border border-[#2D3548]">
+                                                        <View className="w-1.5 h-1.5 rounded-full bg-[#F59E0B] mr-1.5" />
+                                                        <Text className="text-white text-xs font-semibold">{step.name}</Text>
+                                                    </View>
+                                                ))}
+                                            </View>
+                                        </View>
+                                    )}
+
+                                    {/* Route Summary */}
+                                    <View className="bg-[#F59E0B]/10 border border-[#F59E0B]/30 rounded-3xl p-5 mb-4">
+                                        <View className="flex-row items-center justify-between">
+                                            <View className="flex-1">
+                                                <Text className="text-[#F59E0B] text-xs font-bold uppercase tracking-wider mb-1">Auto-Generated Route</Text>
+                                                <Text className="text-white text-lg font-bold">{smartResult.route.from?.name} → {smartResult.route.to?.name}</Text>
+                                                <Text className="text-[#9CA3AF] text-xs mt-1">{smartResult.steps?.length} stops</Text>
+                                            </View>
+                                            <View className="items-end">
+                                                <View className="bg-[#F59E0B] px-4 py-2 rounded-full">
+                                                    <Text className="text-black font-bold text-lg">{smartResult.route.totalDistance?.toFixed(0)}m</Text>
+                                                </View>
+                                                <Text className="text-[#9CA3AF] text-xs mt-1">Total</Text>
+                                            </View>
+                                        </View>
+                                    </View>
+
+                                    {/* Directions with Navigation Mode */}
+                                    <Text className="text-[#9CA3AF] text-xs font-semibold uppercase tracking-wider mb-3">Step-by-Step Directions</Text>
+
+                                    {/* Start Navigation for Smart Assist route */}
+                                    {!navigating ? (
+                                        <TouchableOpacity
+                                            onPress={() => {
+                                                setNavigating(true);
+                                                setCurrentStepIndex(0);
+                                                // Fire insight for first step if available
+                                                if (smartResult.route?.directions?.[0]?.roomId) {
+                                                    const ins = buildingInsights[smartResult.route.directions[0].roomId];
+                                                    if (ins?.length) { setInsightHistory(p => p.find(h => h.title === ins[0].title) ? p : [ins[0], ...p]); showInsight(ins[0]); }
+                                                }
+                                            }}
+                                            className="mb-4 bg-[#F59E0B] rounded-2xl py-3 flex-row items-center justify-center"
+                                            style={{ shadowColor: '#F59E0B', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 4 }}
+                                        >
+                                            <Ionicons name="navigate" size={18} color="#000" />
+                                            <Text className="text-black font-bold text-base ml-2">▶ Start Navigation</Text>
+                                        </TouchableOpacity>
+                                    ) : (
+                                        <View className="flex-row mb-4" style={{ gap: 10 }}>
+                                            <TouchableOpacity onPress={stopNavigating} className="flex-1 bg-[#1F2937] border border-[#374151] rounded-2xl py-3 items-center">
+                                                <Text className="text-[#9CA3AF] font-bold text-sm">✕ Stop</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                onPress={() => {
+                                                    const dirs = smartResult.route?.directions || [];
+                                                    const nextIdx = currentStepIndex + 1;
+                                                    if (nextIdx >= dirs.length) { setNavigating(false); return; }
+                                                    setCurrentStepIndex(nextIdx);
+                                                    if (dirs[nextIdx]?.roomId) {
+                                                        const ins = buildingInsights[dirs[nextIdx].roomId];
+                                                        if (ins?.length) { setInsightHistory(p => p.find(h => h.title === ins[0].title) ? p : [ins[0], ...p]); showInsight(ins[0]); }
+                                                    }
+                                                }}
+                                                className="flex-[2] bg-[#F59E0B] rounded-2xl py-3 items-center"
+                                                style={{ shadowColor: '#F59E0B', shadowOpacity: 0.4, shadowRadius: 8, elevation: 4 }}
+                                            >
+                                                <Text className="text-black font-bold text-base">
+                                                    {currentStepIndex >= (smartResult.route?.directions?.length ?? 0) - 1 ? '✓ Arrived!' : 'Next Step →'}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
+
+                                    {smartResult.route.directions.map((step, i) => (
+                                        <View key={i} style={{ opacity: navigating ? (i === currentStepIndex ? 1 : 0.3) : 1 }}>
+                                            <SmartDirectionStep step={step} isLast={i === smartResult.route.directions.length - 1} />
+                                        </View>
+                                    ))}
+
+                                    <View className="bg-[#10B981]/15 border border-[#10B981]/40 rounded-2xl p-4 mb-4 flex-row items-center justify-center">
+                                        <Ionicons name="checkmark-circle" size={22} color="#10B981" />
+                                        <Text className="text-[#10B981] font-bold text-base ml-2">Route Ready!</Text>
+                                    </View>
+                                </>
+                            ) : (
+                                <View className="items-center py-10">
+                                    <Ionicons name="warning-outline" size={48} color="#F59E0B" />
+                                    <Text className="text-white text-xl font-bold mt-4 text-center">Could Not Generate Route</Text>
+                                    <Text className="text-[#9CA3AF] text-sm mt-2 text-center">{smartResult.message}</Text>
+                                    <TouchableOpacity onPress={resetSmart} className="mt-6 bg-[#1F2937] px-8 py-3 rounded-2xl">
+                                        <Text className="text-white font-bold">Try Again</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+                        </View>
+                    )}
+                </ScrollView>
+            )}
+
+            {/* Smart Assist Tab - History Integration */}
+            {activeTab === 'smart' && insightHistory.length > 0 && (
+                <View className="px-5 pb-6">
+                    <View className="flex-row items-center mb-3 mt-4">
+                        <Ionicons name="time-outline" size={18} color="#9CA3AF" />
+                        <Text className="text-[#9CA3AF] text-sm font-bold ml-2 uppercase tracking-tight">Recent Discovery Log</Text>
                     </View>
-                ) : searchMode && searchResults.length > 0 ? (
-                    // Show Search Results
-                    <View>
-                        <Text className="text-txtMuted text-sm mb-3">
-                            {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} found
-                        </Text>
-                        {searchResults.map((room) => (
-                            <RoomCard
-                                key={room.id}
-                                room={room}
-                                onPress={selectRoom}
-                                isSelected={startRoom?.id === room.id || endRoom?.id === room.id}
+                    {insightHistory.map((item, idx) => (
+                        <View key={idx} className="bg-[#1A2035] rounded-2xl p-4 mb-3 border-l-4 border-[#00D4AA]">
+                            <Text className="text-white font-bold text-sm">{item.title}</Text>
+                            <Text className="text-[#9CA3AF] text-xs mt-1">{item.description}</Text>
+                        </View>
+                    ))}
+                </View>
+            )}
+
+            {/* Context Notification Overlay — absolute floating card */}
+            {activeTab === 'navigation' && activeInsight && (
+                <Animated.View 
+                    style={[
+                        {
+                            position: 'absolute',
+                            bottom: 24,
+                            left: 20,
+                            right: 20,
+                            zIndex: 999,
+                            opacity: notifAnim,
+                            transform: [{ 
+                                translateY: notifAnim.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) 
+                            }]
+                        }
+                    ]}
+                >
+                    <View style={{
+                        backgroundColor: activeInsight.type === 'impact' ? '#00D4AA' : activeInsight.type === 'alert' ? '#EF4444' : '#F59E0B',
+                        borderRadius: 24,
+                        padding: 18,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 8 },
+                        shadowOpacity: 0.4,
+                        shadowRadius: 16,
+                        elevation: 12,
+                    }}>
+                        <View style={{ width: 46, height: 46, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
+                            <Ionicons 
+                                name={activeInsight.type === 'impact' ? 'rocket' : activeInsight.type === 'alert' ? 'warning' : 'information-circle'} 
+                                size={26} color="white" 
                             />
-                        ))}
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={{ color: 'white', fontWeight: '900', fontSize: 16, lineHeight: 20 }}>{activeInsight.title}</Text>
+                            <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13, marginTop: 4 }}>{activeInsight.description}</Text>
+                        </View>
+                        <TouchableOpacity onPress={() => { setActiveInsight(null); }} style={{ marginLeft: 10 }}>
+                            <Ionicons name="close-circle" size={26} color="white" />
+                        </TouchableOpacity>
                     </View>
-                ) : searchMode ? (
-                    <View className="items-center justify-center py-12">
-                        <Ionicons name="search-outline" size={48} color="#6B7280" />
-                        <Text className="text-txtMuted mt-4">No results found</Text>
-                    </View>
-                ) : (
-                    // Show Current Floor Rooms
-                    <View>
-                        <Text className="text-txtMuted text-sm mb-3">
-                            {rooms.length} room{rooms.length !== 1 ? 's' : ''} on this floor
-                        </Text>
-                        {rooms.map((room) => (
-                            <RoomCard
-                                key={room.id}
-                                room={room}
-                                onPress={selectRoom}
-                                isSelected={startRoom?.id === room.id || endRoom?.id === room.id}
-                            />
-                        ))}
-                    </View>
-                )}
-            </ScrollView>
+                </Animated.View>
+            )}
         </SafeAreaView>
     );
 }
