@@ -1,37 +1,8 @@
 import { Tabs } from 'expo-router';
-import React, { useState } from 'react';
-import { Platform, View, TouchableWithoutFeedback, Animated, Text } from 'react-native';
+import React from 'react';
+import { Platform } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
-
-function TabBarIcon({ name, focused }) {
-    const { isDark } = useColorScheme();
-    const iconDim = isDark ? '#9CA3AF' : '#6B7280';
-
-    return (
-        <Ionicons
-            name={focused ? name : `${name}-outline`}
-            size={24}
-            color={focused ? '#00D4AA' : iconDim}
-        />
-    );
-}
-
-function CustomTabBarButton({ children, onPress, accessibilityState }) {
-    const focused = accessibilityState?.selected;
-
-    return (
-        <TouchableWithoutFeedback onPress={onPress}>
-            <View className="flex-1 items-center justify-center">
-                {children}
-                {focused && (
-                    <View className="absolute bottom-1 w-1 h-1 rounded-full bg-[#00D4AA]" />
-                )}
-            </View>
-        </TouchableWithoutFeedback>
-    );
-}
-
 import { useColorScheme } from '../../hooks/use-color-scheme';
 
 export default function TabLayout() {
@@ -44,7 +15,13 @@ export default function TabLayout() {
         <Tabs
             screenOptions={{
                 headerShown: false,
-                tabBarButton: (props) => <CustomTabBarButton {...props} />,
+                tabBarActiveTintColor: '#00D4AA',
+                tabBarInactiveTintColor: isDark ? '#6B7280' : '#9CA3AF',
+                tabBarLabelStyle: {
+                    fontSize: 10,
+                    fontWeight: '600',
+                    marginTop: -2,
+                },
                 tabBarStyle: Platform.select({
                     ios: {
                         position: 'absolute',
@@ -52,16 +29,16 @@ export default function TabLayout() {
                         borderTopWidth: 1,
                         borderTopColor: borderColor,
                         height: 85,
-                        paddingBottom: 25,
-                        paddingTop: 10,
+                        paddingBottom: 24,
+                        paddingTop: 8,
                     },
                     default: {
                         backgroundColor: bgColor,
                         borderTopWidth: 1,
                         borderTopColor: borderColor,
-                        height: 65,
-                        paddingBottom: 10,
-                        paddingTop: 10,
+                        height: 60,
+                        paddingBottom: 8,
+                        paddingTop: 8,
                         elevation: 0,
                     },
                 }),
@@ -70,40 +47,45 @@ export default function TabLayout() {
                 name="home"
                 options={{
                     title: t('tabs.home'),
-                    tabBarShowLabel: false,
-                    tabBarIcon: (props) => <TabBarIcon name="home" {...props} />,
+                    tabBarIcon: ({ color, focused }) => (
+                        <Ionicons name={focused ? 'home' : 'home-outline'} size={22} color={color} />
+                    ),
                 }}
             />
             <Tabs.Screen
                 name="search"
                 options={{
                     title: t('tabs.explore'),
-                    tabBarShowLabel: false,
-                    tabBarIcon: (props) => <TabBarIcon name="search" {...props} />,
+                    tabBarIcon: ({ color, focused }) => (
+                        <Ionicons name={focused ? 'search' : 'search-outline'} size={22} color={color} />
+                    ),
                 }}
             />
             <Tabs.Screen
                 name="activity"
                 options={{
                     title: t('tabs.feedback'),
-                    tabBarShowLabel: false,
-                    tabBarIcon: (props) => <TabBarIcon name="bar-chart" {...props} />,
+                    tabBarIcon: ({ color, focused }) => (
+                        <Ionicons name={focused ? 'bar-chart' : 'bar-chart-outline'} size={22} color={color} />
+                    ),
                 }}
             />
             <Tabs.Screen
                 name="notifications"
                 options={{
                     title: t('tabs.updates'),
-                    tabBarShowLabel: false,
-                    tabBarIcon: (props) => <TabBarIcon name="notifications" {...props} />,
+                    tabBarIcon: ({ color, focused }) => (
+                        <Ionicons name={focused ? 'notifications' : 'notifications-outline'} size={22} color={color} />
+                    ),
                 }}
             />
             <Tabs.Screen
                 name="settings"
                 options={{
                     title: t('tabs.settings'),
-                    tabBarShowLabel: false,
-                    tabBarIcon: (props) => <TabBarIcon name="person" {...props} />,
+                    tabBarIcon: ({ color, focused }) => (
+                        <Ionicons name={focused ? 'person' : 'person-outline'} size={22} color={color} />
+                    ),
                 }}
             />
         </Tabs>

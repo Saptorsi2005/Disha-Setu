@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useColorScheme } from '../../hooks/use-color-scheme';
+import { useRouter } from 'expo-router';
 import { fetchUserFeedback } from '../../services/feedbackService';
 
 const CATEGORY_COLORS = {
@@ -27,34 +28,33 @@ function ActivityItem({ report, isLast }) {
     const timeAgo = new Date(report.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
     return (
-        <View className="flex-row">
-            <View className="items-center mr-4">
-                <View className="w-10 h-10 rounded-full items-center justify-center" style={{ backgroundColor: `${color}20` }}>
-                    <Ionicons name="chatbubble" size={20} color={color} />
-                </View>
-                {!isLast && <View className="w-px h-16 bg-cardBorder my-1" />}
+        <View className={`py-4 flex-row items-start ${!isLast ? 'border-b border-cardBorder' : ''}`}>
+            <View className="w-9 h-9 rounded-lg items-center justify-center mr-3 mt-0.5" style={{ backgroundColor: `${color}18` }}>
+                <Ionicons name="chatbubble-outline" size={17} color={color} />
             </View>
-
-            <View className="flex-1 pt-1 pb-6">
+            <View className="flex-1">
                 <View className="flex-row items-center justify-between mb-1">
-                    <Text className="text-txtMuted text-xs">{timeAgo}</Text>
-                    <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: `${statusColor}20` }}>
-                        <Text className="text-xs font-bold capitalize" style={{ color: statusColor }}>{report.status}</Text>
+                    <Text className="text-txt font-semibold text-sm capitalize">{report.category} issue</Text>
+                    <View className="flex-row items-center gap-2">
+                        <View className="px-2 py-0.5 rounded-md" style={{ backgroundColor: `${statusColor}18` }}>
+                            <Text className="text-[10px] font-bold capitalize" style={{ color: statusColor }}>{report.status}</Text>
+                        </View>
                     </View>
                 </View>
-                <Text className="text-txt font-semibold text-base mb-1 capitalize">{report.category} issue</Text>
-                <Text className="text-txtMuted text-sm leading-5" numberOfLines={2}>
-                    {report.description}
-                </Text>
-                {report.ticket_id && (
-                    <Text className="text-[#00D4AA] text-xs mt-1 font-mono">#{report.ticket_id}</Text>
-                )}
+                <Text className="text-txtMuted text-xs leading-5" numberOfLines={2}>{report.description}</Text>
+                <View className="flex-row items-center justify-between mt-1.5">
+                    {report.ticket_id && (
+                        <Text className="text-[#00D4AA] text-[10px] font-mono">#{report.ticket_id}</Text>
+                    )}
+                    <Text className="text-txtMuted text-[10px] ml-auto">{timeAgo}</Text>
+                </View>
             </View>
         </View>
     );
 }
 
 export default function ActivityScreen() {
+    const router = useRouter();
     const { isDark } = useColorScheme();
     const { t } = useTranslation();
     const iconDim = isDark ? '#9CA3AF' : '#6B7280';
@@ -74,23 +74,18 @@ export default function ActivityScreen() {
         }
     }, []);
 
-    useEffect(() => {
-        loadReports();
-    }, []);
+    useEffect(() => { loadReports(); }, []);
 
-    const onRefresh = () => {
-        setRefreshing(true);
-        loadReports();
-    };
+    const onRefresh = () => { setRefreshing(true); loadReports(); };
 
     const resolvedCount = reports.filter(r => r.status === 'resolved').length;
 
     return (
         <SafeAreaView className="flex-1 bg-main">
             {/* Header */}
-            <View className="px-6 pt-6 pb-4">
-                <Text className="text-txt text-3xl font-bold">{t('activity.title')}</Text>
-                <Text className="text-txtMuted text-sm mt-1">{t('activity.subtitle')}</Text>
+            <View className="px-5 pt-5 pb-4 border-b border-cardBorder">
+                <Text className="text-txt text-2xl font-bold">{t('activity.title')}</Text>
+                <Text className="text-txtMuted text-xs mt-1">{t('activity.subtitle')}</Text>
             </View>
 
             {loading ? (
@@ -104,58 +99,106 @@ export default function ActivityScreen() {
                     showsVerticalScrollIndicator={false}
                     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00D4AA" />}
                 >
-                    {/* Stats */}
-                    <View className="flex-row px-6 mb-8 gap-3">
-                        <View className="flex-1 bg-card rounded-3xl p-4 border border-cardBorder">
-                            <View className="w-10 h-10 rounded-full bg-[#00D4AA20] items-center justify-center mb-3">
-                                <Ionicons name="chatbubbles" size={20} color="#00D4AA" />
+                    {/* Stats row */}
+                    <View className="flex-row px-5 pt-5 mb-5 gap-3">
+                        <View className="flex-1 bg-card rounded-xl p-4 border border-cardBorder flex-row items-center gap-3">
+                            <View className="w-9 h-9 rounded-lg bg-[#00D4AA]/10 items-center justify-center">
+                                <Ionicons name="chatbubbles-outline" size={18} color="#00D4AA" />
                             </View>
-                            <Text className="text-txt text-2xl font-bold mb-1">{reports.length}</Text>
-                            <Text className="text-txtMuted text-xs font-medium">{t('activity.reports')}</Text>
-                        </View>
-                        <View className="flex-1 bg-card rounded-3xl p-4 border border-cardBorder">
-                            <View className="w-10 h-10 rounded-full bg-[#6366F120] items-center justify-center mb-3">
-                                <Ionicons name="checkmark-done-circle" size={20} color="#6366F1" />
-                            </View>
-                            <Text className="text-txt text-2xl font-bold mb-1">{resolvedCount}</Text>
-                            <Text className="text-txtMuted text-xs font-medium">{t('activity.resolved')}</Text>
-                        </View>
-                    </View>
-
-                    {/* Level Banner */}
-                    <View className="mx-6 mb-8 bg-[#00D4AA] rounded-3xl p-5"
-                        style={{ shadowColor: '#00D4AA', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 8 }}
-                    >
-                        <View className="flex-row items-center justify-between mb-3">
                             <View>
-                                <Text className="text-black/70 text-sm font-bold uppercase tracking-wider mb-1">{t('activity.current_level')}</Text>
-                                <Text className="text-black text-xl font-bold">Civic Guardian</Text>
-                            </View>
-                            <View className="w-12 h-12 rounded-full bg-white/20 items-center justify-center">
-                                <Ionicons name="star" size={24} color="#000" />
+                                <Text className="text-txt text-xl font-bold">{reports.length}</Text>
+                                <Text className="text-txtMuted text-xs">{t('activity.reports')}</Text>
                             </View>
                         </View>
-                        <View className="h-2 bg-black/10 rounded-full overflow-hidden mb-2">
-                            <View className="w-3/4 h-full bg-black rounded-full" />
+                        <View className="flex-1 bg-card rounded-xl p-4 border border-cardBorder flex-row items-center gap-3">
+                            <View className="w-9 h-9 rounded-lg bg-[#6366F1]/10 items-center justify-center">
+                                <Ionicons name="checkmark-done-circle-outline" size={18} color="#6366F1" />
+                            </View>
+                            <View>
+                                <Text className="text-txt text-xl font-bold">{resolvedCount}</Text>
+                                <Text className="text-txtMuted text-xs">{t('activity.resolved')}</Text>
+                            </View>
                         </View>
-                        <Text className="text-black/80 text-xs font-medium">150 pts to next level</Text>
                     </View>
 
-                    {/* Timeline */}
-                    <View className="px-6 mb-8">
-                        <View className="flex-row items-center justify-between mb-6">
-                            <Text className="text-txt text-lg font-bold">{t('activity.history')}</Text>
-                            <Text className="text-txtMuted text-sm">{t('search.results', { count: reports.length, s: reports.length !== 1 ? 's' : '' })}</Text>
+                    {/* Badges */}
+                    {(reports.length >= 1 || resolvedCount >= 5) && (
+                        <View className="px-5 mb-5">
+                            <Text className="text-txtMuted text-xs font-semibold mb-3">Recognition</Text>
+                            <View className="flex-col gap-2">
+                                {resolvedCount >= 5 && (
+                                    <View className="flex-row items-center gap-3 bg-card border-l-2 border-[#00D4AA] border border-cardBorder rounded-xl px-4 py-3">
+                                        <Ionicons name="ribbon-outline" size={16} color="#00D4AA" />
+                                        <Text className="text-txt text-sm font-medium">Top Contributor</Text>
+                                    </View>
+                                )}
+                                {reports.length >= 1 && (
+                                    <View className="flex-row items-center gap-3 bg-card border-l-2 border-[#6366F1] border border-cardBorder rounded-xl px-4 py-3">
+                                        <Ionicons name="shield-checkmark-outline" size={16} color="#6366F1" />
+                                        <Text className="text-txt text-sm font-medium">Verified Reporter</Text>
+                                    </View>
+                                )}
+                                {reports.length >= 3 && (
+                                    <View className="flex-row items-center gap-3 bg-card border-l-2 border-[#F59E0B] border border-cardBorder rounded-xl px-4 py-3">
+                                        <Ionicons name="people-outline" size={16} color="#F59E0B" />
+                                        <Text className="text-txt text-sm font-medium">Active Citizen</Text>
+                                    </View>
+                                )}
+                            </View>
+                        </View>
+                    )}
+
+                    {/* Impact */}
+                    <View className="px-5 mb-5">
+                        <Text className="text-txtMuted text-xs font-semibold mb-3">Your Impact</Text>
+                        <View className="bg-card border border-cardBorder rounded-xl p-4">
+                            <View className="flex-row items-center gap-3">
+                                <View className="w-9 h-9 rounded-lg bg-[#10B981]/10 items-center justify-center">
+                                    <Ionicons name="checkmark-done-circle-outline" size={18} color="#10B981" />
+                                </View>
+                                <View className="flex-1">
+                                    <Text className="text-txt text-sm font-semibold">
+                                        {resolvedCount} {resolvedCount === 1 ? 'report' : 'reports'} resolved
+                                    </Text>
+                                    <Text className="text-txtMuted text-xs mt-0.5">
+                                        {resolvedCount > 0
+                                            ? `${resolvedCount} of your reports were acted upon.`
+                                            : 'Your reports are being reviewed.'}
+                                    </Text>
+                                </View>
+                            </View>
+                        </View>
+
+                        <TouchableOpacity
+                            className="bg-card border border-[#00D4AA]/40 rounded-xl p-4 mt-3 flex-row items-center gap-3"
+                            onPress={() => router.push('/feedback')}
+                        >
+                            <View className="w-9 h-9 rounded-lg bg-[#00D4AA]/10 items-center justify-center">
+                                <Ionicons name="megaphone-outline" size={18} color="#00D4AA" />
+                            </View>
+                            <View className="flex-1">
+                                <Text className="text-txt font-semibold text-sm">Report an Issue</Text>
+                                <Text className="text-txtMuted text-xs mt-0.5">Help improve your community</Text>
+                            </View>
+                            <Ionicons name="arrow-forward" size={16} color="#00D4AA" />
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* History */}
+                    <View className="px-5 mb-8">
+                        <View className="flex-row items-center justify-between mb-3">
+                            <Text className="text-txt text-base font-bold">{t('activity.history')}</Text>
+                            <Text className="text-txtMuted text-xs">{reports.length} {reports.length !== 1 ? 'reports' : 'report'}</Text>
                         </View>
 
                         {reports.length === 0 ? (
-                            <View className="bg-card rounded-3xl p-8 border border-cardBorder items-center">
-                                <Ionicons name="document-text-outline" size={48} color={iconDim} />
-                                <Text className="text-txt font-bold text-lg mt-4">{t('activity.no_activity')}</Text>
-                                <Text className="text-txtMuted text-sm mt-2 text-center">{t('activity.start_contributing')}</Text>
+                            <View className="bg-card rounded-xl p-8 border border-cardBorder items-center">
+                                <Ionicons name="document-text-outline" size={40} color={iconDim} />
+                                <Text className="text-txt font-bold text-base mt-4">{t('activity.no_activity')}</Text>
+                                <Text className="text-txtMuted text-xs mt-2 text-center">{t('activity.start_contributing')}</Text>
                             </View>
                         ) : (
-                            <View className="bg-card rounded-3xl p-5 pt-6 border border-cardBorder">
+                            <View className="bg-card rounded-xl px-4 border border-cardBorder">
                                 {reports.map((report, index) => (
                                     <ActivityItem
                                         key={report.id}

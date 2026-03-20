@@ -6,17 +6,10 @@
 import { io } from 'socket.io-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import { BASE_URL } from './api';
 
-// Platform-aware Socket URL
-const getSocketUrl = () => {
-    if (Platform.OS === 'web') {
-        return 'http://localhost:3000';
-    }
-    // For mobile - use your computer's IP address
-    return 'http://192.168.31.95:3000';
-};
-
-const SOCKET_URL = getSocketUrl();
+// Derive Socket URL from BASE_URL (stripping the /api suffix)
+const SOCKET_URL = BASE_URL.replace(/\/api\/?$/, '');
 
 let socket = null;
 let isInitialized = false;
@@ -30,11 +23,11 @@ export const connectSocket = async () => {
 
         socket = io(SOCKET_URL, {
             auth: token ? { token } : {},
-            transports: ['websocket', 'polling'],
-            reconnectionAttempts: 5,
+            transports: ['polling', 'websocket'], // Start with polling for better reliability on mobile
+            reconnectionAttempts: 10,
             reconnectionDelay: 2000,
-            // Increase timeout for Expo Go
-            timeout: Platform.OS === 'web' ? 10000 : 20000,
+            // Increase timeout for Expo Go on mobile
+            timeout: 30000,
         });
 
         socket.on('connect', () => {

@@ -7,7 +7,6 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocation } from '../../hooks/use-location';
-import { formatDistance, haversineKm } from '../../utils/distance';
 import LocationPickerModal from '../../components/location-picker';
 import { useColorScheme } from '../../hooks/use-color-scheme';
 import { useAuth } from '../../context/AuthContext';
@@ -15,64 +14,75 @@ import { fetchProjects } from '../../services/projectService';
 import { emitLocation } from '../../services/socketService';
 import { CATEGORY_ICONS } from '../../constants/mockData';
 import { useTranslation } from 'react-i18next';
+import MapView, { Marker } from 'react-native-maps';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+
+const STATUS_COLOR = {
+    'In Progress': '#00D4AA',
+    'Completed': '#10B981',
+    'Delayed': '#EF4444',
+    'Planned': '#6366F1',
+};
 
 function ProjectCard({ project, onPress }) {
     const { isDark } = useColorScheme();
     const { t } = useTranslation();
     const iconDim = isDark ? '#9CA3AF' : '#6B7280';
     const progress = project.progress_percentage ?? project.progress ?? 0;
+    const statusColor = STATUS_COLOR[project.status] || '#6B7280';
 
     return (
         <TouchableOpacity
-            activeOpacity={0.9}
+            activeOpacity={0.85}
             onPress={onPress}
-            className="bg-card rounded-3xl overflow-hidden mb-6 border border-cardBorder"
-            style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 12, elevation: 5 }}
+            className="bg-card rounded-2xl overflow-hidden mb-4 border border-cardBorder"
+            style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 }}
         >
-            <View className="relative h-48 w-full">
+            {/* Image */}
+            <View className="relative h-44 w-full">
                 <Image source={{ uri: project.image_url || project.image }} className="w-full h-full" />
-                <View className="absolute inset-0 bg-black/30" />
-                <View className="absolute top-4 left-4 flex-row">
-                    <View className="bg-black/60 rounded-full px-3 py-1.5 backdrop-blur-md border border-white/20 mr-2">
-                        <Text className="text-white text-xs font-bold">{project.category}</Text>
+                <View className="absolute inset-0 bg-black/20" />
+                {/* Category label — subtle, bottom-left */}
+                <View className="absolute bottom-3 left-3 flex-row items-center gap-1.5">
+                    <View className="bg-black/50 rounded-md px-2.5 py-1">
+                        <Text className="text-white text-xs font-semibold">{project.category}</Text>
+                    </View>
+                    <View className="flex-row items-center bg-black/50 rounded-md px-2.5 py-1 gap-1">
+                        <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusColor }} />
+                        <Text className="text-white text-xs font-semibold">{project.status}</Text>
                     </View>
                 </View>
-                <View className="absolute top-4 right-4 bg-black/60 rounded-full px-3 py-1.5 backdrop-blur-md border border-white/20 flex-row items-center">
-                    <View className="w-2 h-2 rounded-full bg-[#00D4AA] mr-2" />
-                    <Text className="text-white text-xs font-bold">{project.status}</Text>
-                </View>
-                <View className="absolute bottom-0 left-0 right-0 h-1 bg-black/50">
-                    <View className="h-full bg-[#00D4AA]" style={{ width: `${progress}%` }} />
+                {/* Progress stripe */}
+                <View className="absolute bottom-0 left-0 right-0 h-0.5 bg-black/30">
+                    <View className="h-full" style={{ width: `${progress}%`, backgroundColor: statusColor }} />
                 </View>
             </View>
 
-            <View className="p-5">
-                <Text className="text-txt text-xl font-bold mb-1" numberOfLines={2}>{project.name}</Text>
-                <View className="flex-row items-center mb-4 mt-2">
-                    <Ionicons name="location" size={14} color={iconDim} />
-                    <Text className="text-txtMuted text-sm ml-1 flex-1" numberOfLines={1}>{project.area}</Text>
+            {/* Content */}
+            <View className="p-4">
+                <Text className="text-txt text-base font-bold mb-1 leading-5" numberOfLines={2}>{project.name}</Text>
+                <View className="flex-row items-center mb-3">
+                    <Ionicons name="location-outline" size={13} color={iconDim} />
+                    <Text className="text-txtMuted text-xs ml-1 flex-1" numberOfLines={1}>{project.area}</Text>
                     {project.distance_m != null && (
-                        <View className="bg-surface px-2 py-1 rounded-md ml-2 flex-row items-center">
-                            <Ionicons name="navigate" size={10} color="#00D4AA" />
-                            <Text className="text-[#00D4AA] text-[10px] font-bold ml-1">
-                                {project.distance_m < 1000 ? `${project.distance_m}m` : `${(project.distance_m / 1000).toFixed(1)}km`}
-                            </Text>
-                        </View>
+                        <Text className="text-[#00D4AA] text-xs font-semibold ml-2">
+                            {project.distance_m < 1000 ? `${project.distance_m}m` : `${(project.distance_m / 1000).toFixed(1)}km`}
+                        </Text>
                     )}
                 </View>
-                <View className="flex-row items-center justify-between pt-4 border-t border-cardBorder">
+                <View className="flex-row items-center justify-between pt-3 border-t border-cardBorder">
                     <View>
-                        <Text className="text-txtMuted text-xs mb-1 uppercase tracking-wider font-semibold">{t('home.budget')}</Text>
-                        <Text className="text-txt font-bold">{project.budget_display || project.budget}</Text>
+                        <Text className="text-txtMuted text-[10px] mb-0.5">{t('home.budget')}</Text>
+                        <Text className="text-txt text-sm font-bold">{project.budget_display || project.budget}</Text>
                     </View>
                     <View className="items-end">
-                        <Text className="text-txtMuted text-xs mb-1 uppercase tracking-wider font-semibold">{t('home.completion')}</Text>
-                        <Text className="text-[#00D4AA] font-bold">{project.completion_display || project.expectedCompletion}</Text>
+                        <Text className="text-txtMuted text-[10px] mb-0.5">{t('home.completion')}</Text>
+                        <Text className="text-txt text-sm font-bold">{project.completion_display || project.expectedCompletion}</Text>
                     </View>
-                </View>
-                <View className="mt-4 flex-row items-center justify-between">
-                    <Text className="text-txtMuted text-xs">Dept: {project.department}</Text>
-                    <Text className="text-txtMuted text-xs">ID: {project.id?.slice(0, 8)}</Text>
+                    <View className="items-end">
+                        <Text className="text-txtMuted text-[10px] mb-0.5">Progress</Text>
+                        <Text className="text-sm font-bold" style={{ color: statusColor }}>{progress}%</Text>
+                    </View>
                 </View>
             </View>
         </TouchableOpacity>
@@ -88,11 +98,11 @@ export default function HomeScreen() {
     const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [locationFilter, setLocationFilter] = useState(null); // name of manually-selected location
+    const [locationFilter, setLocationFilter] = useState(null);
     const { isDark } = useColorScheme();
     const iconDim = isDark ? '#9CA3AF' : '#6B7280';
 
-    const { coords, label, mode, startGPS, setManual, accuracy } = useLocation();
+    const { coords, label, mode, startGPS, setManual } = useLocation();
 
     const loadProjects = useCallback(async (lat, lng) => {
         try {
@@ -108,7 +118,6 @@ export default function HomeScreen() {
 
     useEffect(() => {
         loadProjects(coords?.lat, coords?.lng);
-        // Also send location to backend for geo-fencing
         if (coords) emitLocation(coords.lat, coords.lng);
     }, [coords]);
 
@@ -119,17 +128,14 @@ export default function HomeScreen() {
 
     const handleManualSelection = (lat, lng, name) => {
         setManual({ lat, lng, label: name });
-        // Only set a location filter for named preset locations (not 'Custom Location')
         setLocationFilter(name !== 'Custom Location' ? name : null);
         setShowLocationModal(false);
     };
 
-    // Clear the filter when GPS mode is restored
     useEffect(() => {
         if (mode === 'gps') setLocationFilter(null);
     }, [mode]);
 
-    // Apply location filter: when a preset is selected, show ONLY matching projects
     const visibleProjects = useMemo(() => {
         if (!locationFilter) return projects;
         const needle = locationFilter.toLowerCase();
@@ -143,31 +149,48 @@ export default function HomeScreen() {
 
     return (
         <SafeAreaView className="flex-1 bg-main">
-            {/* Header / Location Picker */}
-            <View className="px-5 pt-3 mb-2 z-10">
-                <View className="flex-row justify-between items-center bg-card rounded-full px-4 py-2.5 border border-cardBorder">
-                    <TouchableOpacity className="flex-row items-center flex-1" onPress={() => setShowLocationModal(true)}>
-                        <View className={`w-8 h-8 rounded-full items-center justify-center mr-3 ${mode === 'gps' ? 'bg-[#00D4AA]/20' : 'bg-[#6366F1]/20'}`}>
-                            <Ionicons name={mode === 'gps' ? "location" : "map"} size={16} color={mode === 'gps' ? "#00D4AA" : "#6366F1"} />
+            {/* Header */}
+            <View className="px-4 pt-3 pb-2">
+                <View className="flex-row justify-between items-center">
+                    <TouchableOpacity className="flex-row items-center flex-1 gap-2" onPress={() => setShowLocationModal(true)}>
+                        <View className={`w-7 h-7 rounded-lg items-center justify-center ${mode === 'gps' ? 'bg-[#00D4AA]/15' : 'bg-[#6366F1]/15'}`}>
+                            <Ionicons name={mode === 'gps' ? 'location' : 'map'} size={15} color={mode === 'gps' ? '#00D4AA' : '#6366F1'} />
                         </View>
-                        <View className="flex-1 justify-center">
-                            <Text className="text-txtMuted text-xs font-medium uppercase tracking-wider mb-0.5">
+                        <View className="flex-1">
+                            <Text className="text-txtMuted text-[10px] font-medium mb-0.5">
                                 {mode === 'gps' ? t('home.current_location', 'Current Location') : t('home.test_location', 'Test Location')}
                             </Text>
-                            <View className="flex-row items-center">
-                                <Text className="text-txt font-bold text-sm mr-1" numberOfLines={1}>{label}</Text>
-                                <Ionicons name="chevron-down" size={14} color={iconDim} />
+                            <View className="flex-row items-center gap-1">
+                                <Text className="text-txt font-semibold text-sm" numberOfLines={1}>{label}</Text>
+                                <Ionicons name="chevron-down" size={12} color={iconDim} />
                             </View>
                         </View>
                     </TouchableOpacity>
+
+                    {/* View Mode toggle — inline, no floating pill */}
+                    <View className="flex-row items-center bg-surface rounded-lg p-0.5 border border-cardBorder mr-3">
+                        <TouchableOpacity
+                            className={`px-3 py-1.5 rounded-md ${viewMode === 'list' ? 'bg-card' : ''}`}
+                            onPress={() => setViewMode('list')}
+                        >
+                            <Ionicons name="list" size={16} color={viewMode === 'list' ? '#00D4AA' : iconDim} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            className={`px-3 py-1.5 rounded-md ${viewMode === 'map' ? 'bg-card' : ''}`}
+                            onPress={() => setViewMode('map')}
+                        >
+                            <Ionicons name="map-outline" size={16} color={viewMode === 'map' ? '#00D4AA' : iconDim} />
+                        </TouchableOpacity>
+                    </View>
+
                     <TouchableOpacity
-                        className="w-10 h-10 rounded-full bg-surface items-center justify-center border border-cardBorder overflow-hidden"
+                        className="w-9 h-9 rounded-full bg-surface items-center justify-center border border-cardBorder overflow-hidden"
                         onPress={() => router.push('/settings')}
                     >
                         {user?.avatar_url ? (
                             <Image source={{ uri: user.avatar_url }} className="w-full h-full rounded-full" />
                         ) : (
-                            <Ionicons name="person-circle" size={32} color={iconDim} />
+                            <Ionicons name="person-outline" size={18} color={iconDim} />
                         )}
                     </TouchableOpacity>
                 </View>
@@ -175,10 +198,13 @@ export default function HomeScreen() {
 
             {/* Mode Banner */}
             {mode === 'manual' && (
-                <View className="px-5 mb-3">
-                    <View className="bg-[#6366F1]/10 border border-[#6366F1]/30 rounded-lg px-3 py-2 flex-row items-center">
-                        <Text className="text-[#6366F1] flex-1 text-xs ml-2">{t('home.sim_active')}</Text>
-                        <TouchableOpacity onPress={startGPS}><Text className="text-[#00D4AA] text-xs font-bold">{t('home.use_gps')}</Text></TouchableOpacity>
+                <View className="px-4 mb-2">
+                    <View className="flex-row items-center gap-2 px-3 py-2 rounded-lg border border-[#6366F1]/30 bg-[#6366F1]/8">
+                        <Ionicons name="information-circle-outline" size={14} color="#6366F1" />
+                        <Text className="text-[#6366F1] flex-1 text-xs">{t('home.sim_active')}</Text>
+                        <TouchableOpacity onPress={startGPS}>
+                            <Text className="text-[#00D4AA] text-xs font-semibold">{t('home.use_gps')}</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
             )}
@@ -186,54 +212,92 @@ export default function HomeScreen() {
             {/* Nearest Project Banner */}
             {nearestProject && (
                 <TouchableOpacity
-                    className="mx-5 mb-4 rounded-2xl p-4 border border-[#00D4AA]/30"
-                    style={{ backgroundColor: '#00D4AA10' }}
+                    className="mx-4 mb-3 rounded-xl p-3 border-l-4 border-[#00D4AA] bg-card border border-cardBorder"
+                    style={{ borderLeftWidth: 3, borderLeftColor: '#00D4AA' }}
                     onPress={() => router.push(`/project/${nearestProject.id}`)}
                 >
-                    <View className="flex-row items-center justify-between mb-2">
-                        <View className="flex-row items-center bg-[#00D4AA]/20 px-2 py-1 rounded-md">
-                            <Ionicons name="flash" size={12} color="#00D4AA" />
-                            <Text className="text-[#00D4AA] text-[10px] font-bold ml-1 tracking-wider uppercase">{t('home.nearest_site')}</Text>
+                    <View className="flex-row items-center justify-between">
+                        <View className="flex-1">
+                            <Text className="text-txtMuted text-[10px] font-semibold uppercase mb-0.5">{t('home.nearest_site')}</Text>
+                            <Text className="text-txt font-semibold text-sm" numberOfLines={1}>{nearestProject.name}</Text>
+                            <Text className="text-txtMuted text-xs mt-0.5">{nearestProject.area}</Text>
                         </View>
-                        <Text className="text-[#00D4AA] font-bold text-sm">
-                            {nearestProject.distance_m < 1000 ? `${nearestProject.distance_m}m` : `${(nearestProject.distance_m / 1000).toFixed(1)}km`}
-                        </Text>
+                        <View className="items-end ml-3">
+                            <Text className="text-[#00D4AA] font-bold text-sm">
+                                {nearestProject.distance_m < 1000 ? `${nearestProject.distance_m}m` : `${(nearestProject.distance_m / 1000).toFixed(1)}km`}
+                            </Text>
+                            <Ionicons name="arrow-forward" size={14} color={iconDim} style={{ marginTop: 4 }} />
+                        </View>
                     </View>
-                    <Text className="text-txt font-bold text-base mb-1" numberOfLines={1}>{nearestProject.name}</Text>
-                    <Text className="text-txtMuted text-xs" numberOfLines={1}>{nearestProject.area} • {nearestProject.department}</Text>
                 </TouchableOpacity>
             )}
 
             {/* Main Content */}
-            <View className="flex-1 bg-card rounded-t-3xl border-t border-cardBorder mt-1 overflow-hidden">
+            <View className="flex-1 bg-card rounded-t-2xl border-t border-cardBorder overflow-hidden">
                 {loading ? (
                     <View className="flex-1 items-center justify-center">
                         <ActivityIndicator size="large" color="#00D4AA" />
                         <Text className="text-txtMuted text-sm mt-3">{t('common.loading_projects')}</Text>
                     </View>
                 ) : viewMode === 'map' ? (
-                    <View className="flex-1 bg-surface relative">
-                        <Image
-                            source={{ uri: 'https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80&w=1000' }}
-                            className="absolute inset-0 w-full h-full opacity-60"
-                            style={{ resizeMode: 'cover' }}
-                        />
-                        <View className="absolute inset-x-0 bottom-6 items-center">
-                            <Text className="text-white font-mono text-xs bg-black/50 px-3 py-1 rounded-full mb-4">
-                                {t('home.projects_found', { count: visibleProjects.length, label })}
-                            </Text>
+                    <View className="flex-1 bg-surface relative m-3 mb-20 rounded-2xl overflow-hidden border border-cardBorder">
+                        {coords && (
+                            <MapView
+                                style={{ flex: 1, width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                                userInterfaceStyle="light"
+                                initialRegion={{
+                                    latitude: coords?.lat || 18.5204,
+                                    longitude: coords?.lng || 73.8567,
+                                    latitudeDelta: 0.1,
+                                    longitudeDelta: 0.1,
+                                }}
+                                showsUserLocation={true}
+                            >
+                                {visibleProjects.filter(p => p.lat != null && p.lng != null).map((project) => (
+                                    <Marker
+                                        key={project.id}
+                                        coordinate={{
+                                            latitude: parseFloat(project.lat),
+                                            longitude: parseFloat(project.lng),
+                                        }}
+                                        title={project.name}
+                                        description={`${project.area} • Tap to view`}
+                                        onCalloutPress={() => router.push(`/project/${project.id}`)}
+                                    >
+                                        <View
+                                            className="items-center justify-center rounded-full border-2 border-[#00D4AA]"
+                                            style={{ width: 32, height: 32, backgroundColor: '#111827', elevation: 4 }}
+                                        >
+                                            <MaterialIcons name={CATEGORY_ICONS[project.category] || 'location-on'} size={16} color="#00D4AA" />
+                                        </View>
+                                    </Marker>
+                                ))}
+                            </MapView>
+                        )}
+                        {!coords && (
+                            <View className="flex-1 items-center justify-center bg-card">
+                                <ActivityIndicator size="small" color="#00D4AA" />
+                                <Text className="text-txtMuted text-xs mt-3">{t('home.waiting_location', 'Awaiting location...')}</Text>
+                            </View>
+                        )}
+                        <View className="absolute inset-x-0 bottom-3 items-center">
+                            <View className="bg-card/90 border border-cardBorder px-4 py-1.5 rounded-full">
+                                <Text className="text-txtMuted text-xs">
+                                    {visibleProjects.length} projects near {label}
+                                </Text>
+                            </View>
                         </View>
                     </View>
                 ) : (
                     <ScrollView
                         className="flex-1"
                         showsVerticalScrollIndicator={false}
-                        contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
+                        contentContainerStyle={{ padding: 16, paddingBottom: 90 }}
                         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00D4AA" />}
                     >
                         {projects.length === 0 ? (
                             <View className="items-center justify-center py-20">
-                                <Ionicons name="construct-outline" size={48} color={iconDim} />
+                                <Ionicons name="construct-outline" size={44} color={iconDim} />
                                 <Text className="text-txt font-bold text-lg mt-4">{t('common.no_projects')}</Text>
                                 <Text className="text-txtMuted text-sm mt-2 text-center">{t('common.try_again')}</Text>
                             </View>
@@ -248,24 +312,6 @@ export default function HomeScreen() {
                         )}
                     </ScrollView>
                 )}
-
-                {/* Floating Map/List Toggle */}
-                <View className="absolute bottom-6 left-1/2 -ml-24 flex-row bg-main rounded-full p-1 border border-cardBorder shadow-xl w-48">
-                    <TouchableOpacity
-                        className={`flex-1 flex-row items-center justify-center py-2.5 rounded-full ${viewMode === 'map' ? 'bg-card' : ''}`}
-                        onPress={() => setViewMode('map')}
-                    >
-                        <Ionicons name="map" size={16} color={viewMode === 'map' ? '#00D4AA' : iconDim} />
-                        <Text className={`ml-2 text-sm font-bold ${viewMode === 'map' ? 'text-[#00D4AA]' : 'text-txtMuted'}`}>{t('home.map')}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        className={`flex-1 flex-row items-center justify-center py-2.5 rounded-full ${viewMode === 'list' ? 'bg-card' : ''}`}
-                        onPress={() => setViewMode('list')}
-                    >
-                        <Ionicons name="list" size={16} color={viewMode === 'list' ? '#00D4AA' : iconDim} />
-                        <Text className={`ml-2 text-sm font-bold ${viewMode === 'list' ? 'text-[#00D4AA]' : 'text-txtMuted'}`}>{t('home.list')}</Text>
-                    </TouchableOpacity>
-                </View>
             </View>
 
             <LocationPickerModal
