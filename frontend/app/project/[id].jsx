@@ -358,6 +358,7 @@ export default function ProjectDetailScreen() {
                     </View>
 
                     {/* Indoor Navigation Button (if building has indoor maps) */}
+                    {/* Indoor Navigation Button — Smart Assist is inside the Navigation screen (Smart Assist tab) */}
                     {building && (
                         <TouchableOpacity
                             className="bg-[#8B5CF6] rounded-2xl py-3 items-center flex-row justify-center gap-2 mt-3"
@@ -372,6 +373,10 @@ export default function ProjectDetailScreen() {
                             </View>
                         </TouchableOpacity>
                     )}
+
+
+
+
 
                     {/* Get Directions Button */}
                     {/* Get Directions Button */}
