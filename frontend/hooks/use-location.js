@@ -3,6 +3,7 @@ import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const LOCATION_STORAGE_KEY = 'user_last_location';
+export const LOCATION_PREF_KEY = 'location_permission_enabled';
 
 // Neutral central Bangalore default — only used on very first launch
 const DEFAULT_LOCATION = { label: 'Bangalore', lat: 12.9716, lng: 77.5946 };
@@ -40,6 +41,7 @@ export function useLocation() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [subscription, setSubscription] = useState(null);
+  const [isLocationEnabled, setIsLocationEnabled] = useState(true);
 
   // Restore persisted location on mount
   useEffect(() => {
@@ -57,6 +59,19 @@ export function useLocation() {
       })
       .catch(() => { /* ignore storage errors */ })
       .finally(() => setLoading(false));
+
+    checkLocationPreference();
+  }, []);
+
+  const checkLocationPreference = useCallback(async () => {
+    try {
+      const pref = await AsyncStorage.getItem(LOCATION_PREF_KEY);
+      const enabled = pref === null ? true : pref === 'true';
+      setIsLocationEnabled(enabled);
+      return enabled;
+    } catch (e) {
+      return true; // default true
+    }
   }, []);
 
   // Clean up GPS watcher on unmount or mode change
@@ -74,6 +89,13 @@ export function useLocation() {
     if (subscription) {
       subscription.remove();
       setSubscription(null);
+    }
+
+    const enabled = await checkLocationPreference();
+    if (!enabled) {
+      setError('Location access is disabled in Settings.');
+      setLoading(false);
+      return false;
     }
 
     try {
@@ -137,5 +159,5 @@ export function useLocation() {
     ).catch(() => {});
   }, [subscription]);
 
-  return { coords, label, mode, accuracy, loading, error, startGPS, setManual };
+  return { coords, label, mode, accuracy, loading, error, isLocationEnabled, checkLocationPreference, startGPS, setManual };
 }

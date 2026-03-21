@@ -3,6 +3,7 @@
  * Admin Indoor Navigation Management - Full CRUD for rooms and connections
  */
 import { View, Text, ScrollView, TouchableOpacity, RefreshControl, Alert, Modal, TextInput, Switch, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useState, useEffect, useCallback } from 'react';
 import { useColorScheme } from '../../hooks/use-color-scheme';
@@ -20,7 +21,7 @@ const ROOM_TYPES = [
 
 function RoomCard({ room, onDelete }) {
     const { isDark } = useColorScheme();
-    
+
     const handleDelete = () => {
         Alert.alert(
             'Delete Room',
@@ -43,7 +44,7 @@ function RoomCard({ room, onDelete }) {
             ]
         );
     };
-    
+
     const getTypeIcon = (type) => {
         const icons = {
             'entrance': '🚪', 'exit': '🚪', 'reception': '💁', 'emergency': '🚨',
@@ -53,35 +54,35 @@ function RoomCard({ room, onDelete }) {
         };
         return icons[type?.toLowerCase()] || '📍';
     };
-    
+
     return (
-        <View className={`p-4 rounded-xl ${isDark ? 'bg-gray-800' : 'bg-white'} shadow-sm mb-3 border ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+        <View className="p-4 rounded-xl bg-card shadow-sm mb-3 border border-cardBorder">
             <View className="flex-row items-start justify-between mb-2">
                 <View className="flex-1 flex-row items-start gap-3">
                     <Text className="text-2xl">{getTypeIcon(room.type)}</Text>
                     <View className="flex-1">
-                        <Text className={`font-bold text-base ${isDark ? 'text-white' : 'text-gray-900'} mb-1`}>
+                        <Text className="font-bold text-base text-txt mb-1">
                             {room.name}
                         </Text>
                         <View className="flex-row items-center gap-2 mb-1">
-                            <View className={`px-2 py-0.5 rounded ${isDark ? 'bg-blue-900' : 'bg-blue-100'}`}>
-                                <Text className={`text-xs font-medium ${isDark ? 'text-blue-300' : 'text-blue-700'}`}>
+                            <View className="px-2 py-0.5 rounded bg-[#00D4AA]/10">
+                                <Text className="text-xs font-medium text-[#00D4AA]">
                                     {room.type}
                                 </Text>
                             </View>
                             {room.is_landmark && (
-                                <View className={`px-2 py-0.5 rounded ${isDark ? 'bg-yellow-900' : 'bg-yellow-100'}`}>
-                                    <Text className={`text-xs font-medium ${isDark ? 'text-yellow-300' : 'text-yellow-700'}`}>
+                                <View className="px-2 py-0.5 rounded bg-yellow-500/10">
+                                    <Text className="text-xs font-medium text-yellow-500">
                                         ⭐ Landmark
                                     </Text>
                                 </View>
                             )}
                         </View>
-                        <Text className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                        <Text className="text-xs text-txtMuted">
                             📍 Floor {room.floor_number} • {room.building_name}
                         </Text>
                         {room.room_number && (
-                            <Text className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-500'} mt-1`}>
+                            <Text className="text-xs text-txtMuted mt-1">
                                 Room #{room.room_number}
                             </Text>
                         )}
@@ -89,10 +90,9 @@ function RoomCard({ room, onDelete }) {
                 </View>
                 <TouchableOpacity
                     onPress={handleDelete}
-                    className="bg-red-600 py-2 px-3 rounded-lg"
-                    style={{ elevation: 2 }}
+                    className="bg-red-500/10 py-2 px-3 rounded-lg border border-red-500/20"
                 >
-                    <Ionicons name="trash-outline" size={16} color="white" />
+                    <Ionicons name="trash-outline" size={16} color="#EF4444" />
                 </TouchableOpacity>
             </View>
         </View>
@@ -101,7 +101,7 @@ function RoomCard({ room, onDelete }) {
 
 function ConnectionCard({ connection, onDelete }) {
     const { isDark } = useColorScheme();
-    
+
     const handleDelete = () => {
         Alert.alert(
             'Delete Connection',
@@ -124,39 +124,41 @@ function ConnectionCard({ connection, onDelete }) {
             ]
         );
     };
-    
+
+    const iconDim = isDark ? '#9CA3AF' : '#6B7280';
+
     return (
-        <View className={`p-4 rounded-xl ${isDark ? 'bg-gray-800' : 'bg-white'} shadow-sm mb-3 border ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+        <View className="p-4 rounded-xl bg-card shadow-sm mb-3 border border-cardBorder">
             <View className="flex-row items-center justify-between gap-3">
                 <View className="flex-1">
                     <View className="flex-row items-center gap-2 mb-2">
-                        <View className={`flex-1 ${isDark ? 'bg-gray-700' : 'bg-gray-100'} px-3 py-2 rounded-lg`}>
-                            <Text className={`font-semibold text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                        <View className="flex-1 bg-surface border border-cardBorder px-3 py-2 rounded-lg">
+                            <Text className="font-semibold text-sm text-txt">
                                 {connection.from_room_name}
                             </Text>
                         </View>
-                        <Ionicons name="arrow-forward" size={16} color={isDark ? '#9CA3AF' : '#6B7280'} />
-                        <View className={`flex-1 ${isDark ? 'bg-gray-700' : 'bg-gray-100'} px-3 py-2 rounded-lg`}>
-                            <Text className={`font-semibold text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                        <Ionicons name="arrow-forward" size={16} color={iconDim} />
+                        <View className="flex-1 bg-surface border border-cardBorder px-3 py-2 rounded-lg">
+                            <Text className="font-semibold text-sm text-txt">
                                 {connection.to_room_name}
                             </Text>
                         </View>
                     </View>
-                    <View className="flex-row items-center gap-3">
+                    <View className="flex-row items-center gap-3 mt-1">
                         <View className="flex-row items-center gap-1">
-                            <Ionicons name="walk" size={14} color={isDark ? '#9CA3AF' : '#6B7280'} />
-                            <Text className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                            <Ionicons name="walk" size={14} color={iconDim} />
+                            <Text className="text-xs font-medium text-txtMuted">
                                 {connection.distance}m
                             </Text>
                         </View>
-                        <View className={`px-2 py-0.5 rounded ${connection.is_accessible ? (isDark ? 'bg-green-900' : 'bg-green-100') : (isDark ? 'bg-red-900' : 'bg-red-100')}`}>
-                            <Text className={`text-xs font-medium ${connection.is_accessible ? (isDark ? 'text-green-300' : 'text-green-700') : (isDark ? 'text-red-300' : 'text-red-700')}`}>
+                        <View className={`px-2 py-0.5 rounded ${connection.is_accessible ? 'bg-[#00D4AA]/10' : 'bg-red-500/10'}`}>
+                            <Text className={`text-xs font-medium ${connection.is_accessible ? 'text-[#00D4AA]' : 'text-red-500'}`}>
                                 {connection.is_accessible ? '♿ Accessible' : '🚫 Not accessible'}
                             </Text>
                         </View>
                         {connection.is_bidirectional && (
-                            <View className={`px-2 py-0.5 rounded ${isDark ? 'bg-blue-900' : 'bg-blue-100'}`}>
-                                <Text className={`text-xs font-medium ${isDark ? 'text-blue-300' : 'text-blue-700'}`}>
+                            <View className="px-2 py-0.5 rounded bg-blue-500/10">
+                                <Text className="text-xs font-medium text-blue-500">
                                     ↔ Bidirectional
                                 </Text>
                             </View>
@@ -165,10 +167,9 @@ function ConnectionCard({ connection, onDelete }) {
                 </View>
                 <TouchableOpacity
                     onPress={handleDelete}
-                    className="bg-red-600 py-2 px-3 rounded-lg"
-                    style={{ elevation: 2 }}
+                    className="bg-red-500/10 py-2 px-3 rounded-lg border border-red-500/20"
                 >
-                    <Ionicons name="trash-outline" size={16} color="white" />
+                    <Ionicons name="trash-outline" size={16} color="#EF4444" />
                 </TouchableOpacity>
             </View>
         </View>
@@ -178,6 +179,7 @@ function ConnectionCard({ connection, onDelete }) {
 // Add Room Modal
 function AddRoomModal({ visible, onClose, onAdd, buildings }) {
     const { isDark } = useColorScheme();
+    const iconDim = isDark ? '#9CA3AF' : '#6B7280';
     const [loading, setLoading] = useState(false);
     const [floors, setFloors] = useState([]);
     const [selectedBuilding, setSelectedBuilding] = useState(null);
@@ -185,7 +187,7 @@ function AddRoomModal({ visible, onClose, onAdd, buildings }) {
     const [showBuildingPicker, setShowBuildingPicker] = useState(false);
     const [showFloorPicker, setShowFloorPicker] = useState(false);
     const [showTypePicker, setShowTypePicker] = useState(false);
-    
+
     const [formData, setFormData] = useState({
         name: '',
         type: 'room',
@@ -249,33 +251,33 @@ function AddRoomModal({ visible, onClose, onAdd, buildings }) {
     return (
         <Modal visible={visible} animationType="slide" transparent>
             <View className="flex-1 bg-black/50 justify-end">
-                <View className={`${isDark ? 'bg-gray-900' : 'bg-white'} rounded-t-3xl p-6 max-h-[90%]`}>
+                <View className="bg-main rounded-t-3xl p-6 max-h-[90%] border-t border-cardBorder">
                     <View className="flex-row items-center justify-between mb-6">
-                        <Text className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                        <Text className="text-2xl font-bold text-txt">
                             Add New Room
                         </Text>
                         <TouchableOpacity onPress={onClose}>
-                            <Ionicons name="close" size={28} color={isDark ? '#FFF' : '#000'} />
+                            <Ionicons name="close" size={28} color={iconDim} />
                         </TouchableOpacity>
                     </View>
 
                     <ScrollView showsVerticalScrollIndicator={false}>
                         {/* Building Selector */}
-                        <Text className={`text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        <Text className="text-sm font-medium mb-2 text-txtMuted">
                             Building *
                         </Text>
                         <TouchableOpacity
                             onPress={() => setShowBuildingPicker(!showBuildingPicker)}
-                            className={`p-4 rounded-xl mb-4 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-300'} border`}
+                            className="p-4 rounded-xl mb-4 bg-card border border-cardBorder"
                         >
-                            <Text className={selectedBuilding ? (isDark ? 'text-white' : 'text-gray-900') : 'text-gray-500'}>
+                            <Text className={selectedBuilding ? 'text-txt' : 'text-txtMuted'}>
                                 {selectedBuilding ? selectedBuilding.name : 'Select a building'}
                             </Text>
                         </TouchableOpacity>
                         {showBuildingPicker && (
                             <View className="mb-4" style={{ maxHeight: 200 }}>
-                                <ScrollView 
-                                    className={`rounded-xl overflow-hidden ${isDark ? 'bg-gray-800' : 'bg-gray-50'}`}
+                                <ScrollView
+                                    className="rounded-xl overflow-hidden bg-surface border border-cardBorder"
                                     nestedScrollEnabled={true}
                                     showsVerticalScrollIndicator={true}
                                 >
@@ -287,9 +289,9 @@ function AddRoomModal({ visible, onClose, onAdd, buildings }) {
                                                 setSelectedFloor(null);
                                                 setShowBuildingPicker(false);
                                             }}
-                                            className={`p-3 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}
+                                            className="p-3 border-b border-cardBorder"
                                         >
-                                            <Text className={isDark ? 'text-white' : 'text-gray-900'}>
+                                            <Text className="text-txt">
                                                 {building.name}
                                             </Text>
                                         </TouchableOpacity>
@@ -301,38 +303,38 @@ function AddRoomModal({ visible, onClose, onAdd, buildings }) {
                         {/* Floor Selector */}
                         {selectedBuilding && (
                             <>
-                                <Text className={`text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                <Text className="text-sm font-medium mb-2 text-txtMuted">
                                     Floor *
                                 </Text>
                                 <TouchableOpacity
                                     onPress={() => setShowFloorPicker(!showFloorPicker)}
-                                    className={`p-4 rounded-xl mb-4 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-300'} border`}
+                                    className="p-4 rounded-xl mb-4 bg-card border border-cardBorder"
                                 >
-                                    <Text className={selectedFloor ? (isDark ? 'text-white' : 'text-gray-900') : 'text-gray-500'}>
+                                    <Text className={selectedFloor ? 'text-txt' : 'text-txtMuted'}>
                                         {selectedFloor ? `Floor ${selectedFloor.floor_number} - ${selectedFloor.name}` : 'Select a floor'}
                                     </Text>
                                 </TouchableOpacity>
                                 {showFloorPicker && (
                                     <View className="mb-4" style={{ maxHeight: 200 }}>
-                                        <ScrollView 
-                                            className={`rounded-xl overflow-hidden ${isDark ? 'bg-gray-800' : 'bg-gray-50'}`}
+                                        <ScrollView
+                                            className="rounded-xl overflow-hidden bg-surface border border-cardBorder"
                                             nestedScrollEnabled={true}
                                             showsVerticalScrollIndicator={true}
                                         >
-                                        {floors.map(floor => (
-                                            <TouchableOpacity
-                                                key={floor.id}
-                                                onPress={() => {
-                                                    setSelectedFloor(floor);
-                                                    setShowFloorPicker(false);
-                                                }}
-                                                className={`p-3 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}
-                                            >
-                                                <Text className={isDark ? 'text-white' : 'text-gray-900'}>
-                                                    Floor {floor.floor_number} - {floor.name}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        ))}
+                                            {floors.map(floor => (
+                                                <TouchableOpacity
+                                                    key={floor.id}
+                                                    onPress={() => {
+                                                        setSelectedFloor(floor);
+                                                        setShowFloorPicker(false);
+                                                    }}
+                                                    className="p-3 border-b border-cardBorder"
+                                                >
+                                                    <Text className="text-txt">
+                                                        Floor {floor.floor_number} - {floor.name}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            ))}
                                         </ScrollView>
                                     </View>
                                 )}
@@ -340,33 +342,33 @@ function AddRoomModal({ visible, onClose, onAdd, buildings }) {
                         )}
 
                         {/* Room Name */}
-                        <Text className={`text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        <Text className="text-sm font-medium mb-2 text-txtMuted">
                             Room Name *
                         </Text>
                         <TextInput
                             value={formData.name}
                             onChangeText={(text) => setFormData({ ...formData, name: text })}
                             placeholder="e.g., Emergency Room 101"
-                            placeholderTextColor="#9CA3AF"
-                            className={`p-4 rounded-xl mb-4 ${isDark ? 'bg-gray-800 text-white border-gray-700' : 'bg-gray-50 text-gray-900 border-gray-300'} border`}
+                            placeholderTextColor={iconDim}
+                            className="p-4 rounded-xl mb-4 bg-card text-txt border border-cardBorder"
                         />
 
                         {/* Room Type */}
-                        <Text className={`text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        <Text className="text-sm font-medium mb-2 text-txtMuted">
                             Room Type *
                         </Text>
                         <TouchableOpacity
                             onPress={() => setShowTypePicker(!showTypePicker)}
-                            className={`p-4 rounded-xl mb-4 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-300'} border`}
+                            className="p-4 rounded-xl mb-4 bg-card border border-cardBorder"
                         >
-                            <Text className={isDark ? 'text-white' : 'text-gray-900'}>
+                            <Text className="text-txt">
                                 {formData.type}
                             </Text>
                         </TouchableOpacity>
                         {showTypePicker && (
                             <View className="mb-4" style={{ maxHeight: 200 }}>
                                 <ScrollView
-                                    className={`rounded-xl ${isDark ? 'bg-gray-800' : 'bg-gray-50'}`}
+                                    className="rounded-xl overflow-hidden bg-surface border border-cardBorder"
                                     nestedScrollEnabled={true}
                                     showsVerticalScrollIndicator={true}
                                 >
@@ -377,9 +379,9 @@ function AddRoomModal({ visible, onClose, onAdd, buildings }) {
                                                 setFormData({ ...formData, type });
                                                 setShowTypePicker(false);
                                             }}
-                                            className={`p-3 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}
+                                            className="p-3 border-b border-cardBorder"
                                         >
-                                            <Text className={isDark ? 'text-white' : 'text-gray-900'}>
+                                            <Text className="text-txt">
                                                 {type}
                                             </Text>
                                         </TouchableOpacity>
@@ -389,50 +391,54 @@ function AddRoomModal({ visible, onClose, onAdd, buildings }) {
                         )}
 
                         {/* Room Number (Optional) */}
-                        <Text className={`text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        <Text className="text-sm font-medium mb-2 text-txtMuted">
                             Room Number (Optional)
                         </Text>
                         <TextInput
                             value={formData.room_number}
                             onChangeText={(text) => setFormData({ ...formData, room_number: text })}
                             placeholder="e.g., 101, A-23"
-                            placeholderTextColor="#9CA3AF"
-                            className={`p-4 rounded-xl mb-4 ${isDark ? 'bg-gray-800 text-white border-gray-700' : 'bg-gray-50 text-gray-900 border-gray-300'} border`}
+                            placeholderTextColor={iconDim}
+                            className="p-4 rounded-xl mb-4 bg-card text-txt border border-cardBorder"
                         />
 
                         {/* Description (Optional) */}
-                        <Text className={`text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        <Text className="text-sm font-medium mb-2 text-txtMuted">
                             Description (Optional)
                         </Text>
                         <TextInput
                             value={formData.description}
                             onChangeText={(text) => setFormData({ ...formData, description: text })}
                             placeholder="Brief description"
-                            placeholderTextColor="#9CA3AF"
+                            placeholderTextColor={iconDim}
                             multiline
                             numberOfLines={3}
-                            className={`p-4 rounded-xl mb-4 ${isDark ? 'bg-gray-800 text-white border-gray-700' : 'bg-gray-50 text-gray-900 border-gray-300'} border`}
+                            className="p-4 rounded-xl mb-4 bg-card text-txt border border-cardBorder"
                             style={{ textAlignVertical: 'top' }}
                         />
 
                         {/* Switches */}
                         <View className="flex-row items-center justify-between mb-4">
-                            <Text className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                            <Text className="text-sm font-medium text-txt">
                                 Wheelchair Accessible
                             </Text>
                             <Switch
                                 value={formData.is_accessible}
                                 onValueChange={(value) => setFormData({ ...formData, is_accessible: value })}
+                                trackColor={{ false: '#374151', true: '#00D4AA' }}
+                                thumbColor="#fff"
                             />
                         </View>
 
                         <View className="flex-row items-center justify-between mb-6">
-                            <Text className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                            <Text className="text-sm font-medium text-txt">
                                 Mark as Landmark
                             </Text>
                             <Switch
                                 value={formData.is_landmark}
                                 onValueChange={(value) => setFormData({ ...formData, is_landmark: value })}
+                                trackColor={{ false: '#374151', true: '#00D4AA' }}
+                                thumbColor="#fff"
                             />
                         </View>
 
@@ -440,13 +446,13 @@ function AddRoomModal({ visible, onClose, onAdd, buildings }) {
                         <TouchableOpacity
                             onPress={handleSubmit}
                             disabled={loading}
-                            className="bg-blue-600 py-4 rounded-xl items-center mb-4"
+                            className="bg-[#00D4AA] py-4 rounded-xl items-center mb-4 border border-[#00D4AA]/50"
                             style={{ elevation: 4 }}
                         >
                             {loading ? (
                                 <ActivityIndicator color="white" />
                             ) : (
-                                <Text className="text-white font-bold text-base">Add Room</Text>
+                                <Text className="text-black font-bold text-base">Add Room</Text>
                             )}
                         </TouchableOpacity>
                     </ScrollView>
@@ -459,6 +465,7 @@ function AddRoomModal({ visible, onClose, onAdd, buildings }) {
 // Add Connection Modal
 function AddConnectionModal({ visible, onClose, onAdd, rooms }) {
     const { isDark } = useColorScheme();
+    const iconDim = isDark ? '#9CA3AF' : '#6B7280';
     const [loading, setLoading] = useState(false);
     const [showFromPicker, setShowFromPicker] = useState(false);
     const [showToPicker, setShowToPicker] = useState(false);
@@ -509,33 +516,33 @@ function AddConnectionModal({ visible, onClose, onAdd, rooms }) {
     return (
         <Modal visible={visible} animationType="slide" transparent>
             <View className="flex-1 bg-black/50 justify-end">
-                <View className={`${isDark ? 'bg-gray-900' : 'bg-white'} rounded-t-3xl p-6 max-h-[90%]`}>
+                <View className="bg-main rounded-t-3xl p-6 max-h-[90%] border-t border-cardBorder">
                     <View className="flex-row items-center justify-between mb-6">
-                        <Text className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                        <Text className="text-2xl font-bold text-txt">
                             Add New Connection
                         </Text>
                         <TouchableOpacity onPress={onClose}>
-                            <Ionicons name="close" size={28} color={isDark ? '#FFF' : '#000'} />
+                            <Ionicons name="close" size={28} color={iconDim} />
                         </TouchableOpacity>
                     </View>
 
                     <ScrollView showsVerticalScrollIndicator={false}>
                         {/* From Room */}
-                        <Text className={`text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        <Text className="text-sm font-medium mb-2 text-txtMuted">
                             From Room *
                         </Text>
                         <TouchableOpacity
                             onPress={() => setShowFromPicker(!showFromPicker)}
-                            className={`p-4 rounded-xl mb-4 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-300'} border`}
+                            className="p-4 rounded-xl mb-4 bg-card border border-cardBorder"
                         >
-                            <Text className={fromRoom ? (isDark ? 'text-white' : 'text-gray-900') : 'text-gray-500'}>
+                            <Text className={fromRoom ? 'text-txt' : 'text-txtMuted'}>
                                 {fromRoom ? `${fromRoom.name} (Floor ${fromRoom.floor_number})` : 'Select starting room'}
                             </Text>
                         </TouchableOpacity>
                         {showFromPicker && (
                             <View className="mb-4" style={{ maxHeight: 250 }}>
-                                <ScrollView 
-                                    className={`rounded-xl overflow-hidden ${isDark ? 'bg-gray-800' : 'bg-gray-50'}`}
+                                <ScrollView
+                                    className="rounded-xl overflow-hidden bg-surface border border-cardBorder"
                                     nestedScrollEnabled={true}
                                     showsVerticalScrollIndicator={true}
                                 >
@@ -546,12 +553,12 @@ function AddConnectionModal({ visible, onClose, onAdd, rooms }) {
                                                 setFromRoom(room);
                                                 setShowFromPicker(false);
                                             }}
-                                            className={`p-3 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}
+                                            className="p-3 border-b border-cardBorder"
                                         >
-                                            <Text className={isDark ? 'text-white font-medium' : 'text-gray-900 font-medium'}>
+                                            <Text className="text-txt font-medium">
                                                 {room.name}
                                             </Text>
-                                            <Text className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                                            <Text className="text-xs text-txtMuted mt-0.5">
                                                 Floor {room.floor_number} • {room.building_name}
                                             </Text>
                                         </TouchableOpacity>
@@ -561,89 +568,99 @@ function AddConnectionModal({ visible, onClose, onAdd, rooms }) {
                         )}
 
                         {/* To Room */}
-                        <Text className={`text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        <Text className="text-sm font-medium mb-2 text-txtMuted">
                             To Room *
                         </Text>
                         <TouchableOpacity
                             onPress={() => setShowToPicker(!showToPicker)}
-                            className={`p-4 rounded-xl mb-4 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-300'} border`}
+                            className="p-4 rounded-xl mb-4 bg-card border border-cardBorder"
                         >
-                            <Text className={toRoom ? (isDark ? 'text-white' : 'text-gray-900') : 'text-gray-500'}>
+                            <Text className={toRoom ? 'text-txt' : 'text-txtMuted'}>
                                 {toRoom ? `${toRoom.name} (Floor ${toRoom.floor_number})` : 'Select destination room'}
                             </Text>
                         </TouchableOpacity>
                         {showToPicker && (
                             <View className="mb-4" style={{ maxHeight: 250 }}>
-                                <ScrollView 
-                                    className={`rounded-xl overflow-hidden ${isDark ? 'bg-gray-800' : 'bg-gray-50'}`}
+                                <ScrollView
+                                    className="rounded-xl overflow-hidden bg-surface border border-cardBorder"
                                     nestedScrollEnabled={true}
                                     showsVerticalScrollIndicator={true}
                                 >
-                                {rooms.map(room => (
-                                    <TouchableOpacity
-                                        key={room.id}
-                                        onPress={() => {
-                                            setToRoom(room);
-                                            setShowToPicker(false);
-                                        }}
-                                        className={`p-3 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}
-                                    >
-                                        <Text className={isDark ? 'text-white font-medium' : 'text-gray-900 font-medium'}>
-                                            {room.name}
-                                        </Text>
-                                        <Text className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                                            Floor {room.floor_number} • {room.building_name}
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))}
+                                    {rooms.map(room => (
+                                        <TouchableOpacity
+                                            key={room.id}
+                                            onPress={() => {
+                                                setToRoom(room);
+                                                setShowToPicker(false);
+                                            }}
+                                            className="p-3 border-b border-cardBorder"
+                                        >
+                                            <Text className="text-txt font-medium">
+                                                {room.name}
+                                            </Text>
+                                            <Text className="text-xs text-txtMuted mt-0.5">
+                                                Floor {room.floor_number} • {room.building_name}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
                                 </ScrollView>
                             </View>
                         )}
 
                         {/* Distance */}
-                        <Text className={`text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        <Text className="text-sm font-medium mb-2 text-txtMuted">
                             Distance (meters) *
                         </Text>
                         <TextInput
                             value={distance}
                             onChangeText={setDistance}
                             placeholder="e.g., 15"
-                            placeholderTextColor="#9CA3AF"
+                            placeholderTextColor={iconDim}
                             keyboardType="decimal-pad"
-                            className={`p-4 rounded-xl mb-4 ${isDark ? 'bg-gray-800 text-white border-gray-700' : 'bg-gray-50 text-gray-900 border-gray-300'} border`}
+                            className="p-4 rounded-xl mb-4 bg-card text-txt border border-cardBorder"
                         />
 
                         {/* Switches */}
                         <View className="flex-row items-center justify-between mb-4">
-                            <Text className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                            <Text className="text-sm font-medium text-txt">
                                 Wheelchair Accessible
                             </Text>
-                            <Switch value={isAccessible} onValueChange={setIsAccessible} />
+                            <Switch 
+                                value={isAccessible} 
+                                onValueChange={setIsAccessible} 
+                                trackColor={{ false: '#374151', true: '#00D4AA' }}
+                                thumbColor="#fff"
+                            />
                         </View>
 
                         <View className="flex-row items-center justify-between mb-6">
                             <View className="flex-1 mr-4">
-                                <Text className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                <Text className="text-sm font-medium text-txt">
                                     Bidirectional
                                 </Text>
-                                <Text className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+                                <Text className="text-xs text-txtMuted">
                                     Can travel in both directions
                                 </Text>
                             </View>
-                            <Switch value={isBidirectional} onValueChange={setIsBidirectional} />
+                            <Switch 
+                                value={isBidirectional} 
+                                onValueChange={setIsBidirectional} 
+                                trackColor={{ false: '#374151', true: '#00D4AA' }}
+                                thumbColor="#fff"
+                            />
                         </View>
 
                         {/* Submit Button */}
                         <TouchableOpacity
                             onPress={handleSubmit}
                             disabled={loading}
-                            className="bg-blue-600 py-4 rounded-xl items-center mb-4"
+                            className="bg-[#00D4AA] py-4 rounded-xl items-center mb-4 border border-[#00D4AA]/50"
                             style={{ elevation: 4 }}
                         >
                             {loading ? (
                                 <ActivityIndicator color="white" />
                             ) : (
-                                <Text className="text-white font-bold text-base">Add Connection</Text>
+                                <Text className="text-black font-bold text-base">Add Connection</Text>
                             )}
                         </TouchableOpacity>
                     </ScrollView>
@@ -656,8 +673,9 @@ function AddConnectionModal({ visible, onClose, onAdd, rooms }) {
 export default function AdminNavigationManagement() {
     const router = useRouter();
     const { isDark } = useColorScheme();
+    const iconDim = isDark ? '#9CA3AF' : '#6B7280';
     const { user } = useAuth();
-    
+
     const [rooms, setRooms] = useState([]);
     const [connections, setConnections] = useState([]);
     const [buildings, setBuildings] = useState([]);
@@ -667,17 +685,17 @@ export default function AdminNavigationManagement() {
     const [activeTab, setActiveTab] = useState('rooms');
     const [showAddRoomModal, setShowAddRoomModal] = useState(false);
     const [showAddConnectionModal, setShowAddConnectionModal] = useState(false);
-    
+
     const loadData = useCallback(async () => {
         try {
             const [navData, buildingsData] = await Promise.all([
                 getNavigationData(selectedBuilding),
                 getBuildings()
             ]);
-            
+
             console.log('Navigation data:', navData);
             console.log('Buildings data:', buildingsData);
-            
+
             setRooms(navData.rooms || []);
             setConnections(navData.connections || []);
             setBuildings(Array.isArray(buildingsData) ? buildingsData : buildingsData.buildings || []);
@@ -689,101 +707,97 @@ export default function AdminNavigationManagement() {
             setRefreshing(false);
         }
     }, [selectedBuilding]);
-    
+
     useEffect(() => {
         if (user?.role !== 'admin') {
             router.replace('/');
             return;
         }
-        
+
         loadData();
     }, [user, selectedBuilding]);
-    
+
     const onRefresh = () => {
         setRefreshing(true);
         loadData();
     };
-    
+
     if (loading) {
         return (
-            <View className={`flex-1 ${isDark ? 'bg-gray-900' : 'bg-gray-50'} items-center justify-center`}>
-                <ActivityIndicator size="large" color="#3B82F6" />
-                <Text className={`mt-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>Loading...</Text>
+            <View className="flex-1 bg-main items-center justify-center">
+                <ActivityIndicator size="large" color="#00D4AA" />
+                <Text className="mt-4 text-txt">Loading...</Text>
             </View>
         );
     }
-    
+
     return (
-        <View className={`flex-1 ${isDark ? 'bg-gray-900' : 'bg-gray-50'}`}>
+        <SafeAreaView className="flex-1 bg-main">
             {/* Header */}
-            <View className={`p-6 ${isDark ? 'bg-gray-800' : 'bg-white'} shadow-sm`} style={{ elevation: 2 }}>
-                <TouchableOpacity 
-                    onPress={() => router.back()} 
+            <View className="p-6 bg-card border-b border-cardBorder">
+                <TouchableOpacity
+                    onPress={() => router.back()}
                     className="mb-4 flex-row items-center gap-2"
                 >
-                    <Ionicons name="arrow-back" size={20} color="#3B82F6" />
-                    <Text className="text-blue-500 text-base font-medium">Back to Dashboard</Text>
+                    <Ionicons name="arrow-back" size={20} color="#00D4AA" />
+                    <Text className="text-[#00D4AA] text-base font-medium">Back to Dashboard</Text>
                 </TouchableOpacity>
-                
-                <Text className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'} mb-2`}>
+
+                <Text className="text-3xl font-bold text-txt mb-2">
                     Indoor Navigation
                 </Text>
                 <View className="flex-row items-center gap-4">
                     <View className="flex-row items-center gap-2">
-                        <Ionicons name="location" size={18} color={isDark ? '#9CA3AF' : '#6B7280'} />
-                        <Text className={`text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        <Ionicons name="location" size={18} color={iconDim} />
+                        <Text className="text-sm font-semibold text-txtMuted">
                             {rooms.length} Rooms
                         </Text>
                     </View>
                     <View className="flex-row items-center gap-2">
-                        <Ionicons name="git-network" size={18} color={isDark ? '#9CA3AF' : '#6B7280'} />
-                        <Text className={`text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        <Ionicons name="git-network" size={18} color={iconDim} />
+                        <Text className="text-sm font-semibold text-txtMuted">
                             {connections.length} Connections
                         </Text>
                     </View>
                     <View className="flex-row items-center gap-2">
-                        <Ionicons name="business" size={18} color={isDark ? '#9CA3AF' : '#6B7280'} />
-                        <Text className={`text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        <Ionicons name="business" size={18} color={iconDim} />
+                        <Text className="text-sm font-semibold text-txtMuted">
                             {buildings.length} Buildings
                         </Text>
                     </View>
                 </View>
             </View>
-            
+
             {/* Building Filter */}
             {buildings.length > 0 && (
                 <View className="px-4 py-3">
-                    <Text className={`text-xs font-semibold uppercase mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                    <Text className="text-xs font-semibold uppercase mb-2 text-txtMuted">
                         Filter by Building
                     </Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                         <TouchableOpacity
                             onPress={() => setSelectedBuilding(null)}
-                            className={`mr-2 py-2.5 px-4 rounded-xl ${
-                                !selectedBuilding ? 'bg-blue-600' : isDark ? 'bg-gray-800' : 'bg-white'
-                            }`}
+                            className={`mr-2 py-2.5 px-4 rounded-xl ${!selectedBuilding ? 'bg-[#00D4AA]' : 'bg-card border border-cardBorder'}`}
                             style={{ elevation: !selectedBuilding ? 4 : 0 }}
                         >
                             <View className="flex-row items-center gap-2">
-                                <Ionicons name="apps" size={16} color={!selectedBuilding ? 'white' : (isDark ? '#9CA3AF' : '#6B7280')} />
-                                <Text className={!selectedBuilding ? 'text-white font-semibold' : isDark ? 'text-gray-300' : 'text-gray-700'}>
+                                <Ionicons name="apps" size={16} color={!selectedBuilding ? 'black' : iconDim} />
+                                <Text className={!selectedBuilding ? 'text-black font-bold' : 'text-txt font-medium'}>
                                     All Buildings
                                 </Text>
                             </View>
                         </TouchableOpacity>
-                        
+
                         {buildings.map(building => (
                             <TouchableOpacity
                                 key={building.id}
                                 onPress={() => setSelectedBuilding(building.id)}
-                                className={`mr-2 py-2.5 px-4 rounded-xl ${
-                                    selectedBuilding === building.id ? 'bg-blue-600' : isDark ? 'bg-gray-800' : 'bg-white'
-                                }`}
+                                className={`mr-2 py-2.5 px-4 rounded-xl ${selectedBuilding === building.id ? 'bg-[#00D4AA]' : 'bg-card border border-cardBorder'}`}
                                 style={{ elevation: selectedBuilding === building.id ? 4 : 0 }}
                             >
                                 <View className="flex-row items-center gap-2">
-                                    <Ionicons name="business" size={16} color={selectedBuilding === building.id ? 'white' : (isDark ? '#9CA3AF' : '#6B7280')} />
-                                    <Text className={selectedBuilding === building.id ? 'text-white font-semibold' : isDark ? 'text-gray-300' : 'text-gray-700'}>
+                                    <Ionicons name="business" size={16} color={selectedBuilding === building.id ? 'black' : iconDim} />
+                                    <Text className={selectedBuilding === building.id ? 'text-black font-bold' : 'text-txt font-medium'}>
                                         {building.name}
                                     </Text>
                                 </View>
@@ -792,71 +806,62 @@ export default function AdminNavigationManagement() {
                     </ScrollView>
                 </View>
             )}
-            
+
             {/* Tabs with Add Buttons */}
-            <View className="flex-row px-4 gap-2 mb-3">
+            <View className="flex-row px-4 gap-2 mb-3 mt-1">
                 <TouchableOpacity
                     onPress={() => setActiveTab('rooms')}
-                    className={`flex-1 py-3 rounded-xl ${
-                        activeTab === 'rooms' ? 'bg-blue-600' : isDark ? 'bg-gray-800' : 'bg-white'
-                    }`}
+                    className={`flex-1 py-3 rounded-xl ${activeTab === 'rooms' ? 'bg-[#00D4AA]' : 'bg-card border border-cardBorder'}`}
                 >
-                    <Text className={`text-center font-semibold ${
-                        activeTab === 'rooms' ? 'text-white' : isDark ? 'text-gray-300' : 'text-gray-700'
-                    }`}>
+                    <Text className={`text-center font-bold ${activeTab === 'rooms' ? 'text-black' : 'text-txtMuted'}`}>
                         Rooms ({rooms.length})
                     </Text>
                 </TouchableOpacity>
-                
+
                 <TouchableOpacity
                     onPress={() => setActiveTab('connections')}
-                    className={`flex-1 py-3 rounded-xl ${
-                        activeTab === 'connections' ? 'bg-blue-600' : isDark ? 'bg-gray-800' : 'bg-white'
-                    }`}
+                    className={`flex-1 py-3 rounded-xl ${activeTab === 'connections' ? 'bg-[#00D4AA]' : 'bg-card border border-cardBorder'}`}
                 >
-                    <Text className={`text-center font-semibold ${
-                        activeTab === 'connections' ? 'text-white' : isDark ? 'text-gray-300' : 'text-gray-700'
-                    }`}>
+                    <Text className={`text-center font-bold ${activeTab === 'connections' ? 'text-black' : 'text-txtMuted'}`}>
                         Connections ({connections.length})
                     </Text>
                 </TouchableOpacity>
             </View>
-            
+
             {/* Add Button in Header */}
             <View className="px-4 mb-3">
                 <TouchableOpacity
                     onPress={() => activeTab === 'rooms' ? setShowAddRoomModal(true) : setShowAddConnectionModal(true)}
-                    className="bg-green-600 py-3 px-4 rounded-xl flex-row items-center justify-center gap-2"
-                    style={{ elevation: 4 }}
+                    className="bg-[#00D4AA]/20 py-3 px-4 rounded-xl flex-row items-center justify-center gap-2 border border-[#00D4AA]/30"
                 >
-                    <Ionicons name="add-circle" size={20} color="white" />
-                    <Text className="text-white font-bold">
+                    <Ionicons name="add-circle" size={20} color="#00D4AA" />
+                    <Text className="text-[#00D4AA] font-bold">
                         Add {activeTab === 'rooms' ? 'Room' : 'Connection'}
                     </Text>
                 </TouchableOpacity>
             </View>
-            
+
             {/* Content */}
             <ScrollView
-                className="flex-1 px-4"
+                className="flex-1 px-4 mt-2"
                 refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00D4AA" />
                 }
             >
                 {activeTab === 'rooms' ? (
                     rooms.length === 0 ? (
                         <View className="items-center justify-center py-16">
-                            <Ionicons name="location-outline" size={64} color={isDark ? '#4B5563' : '#D1D5DB'} />
-                            <Text className={`text-lg font-semibold mt-4 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                            <Ionicons name="location-outline" size={64} color={iconDim} />
+                            <Text className="text-lg font-semibold mt-4 text-txt">
                                 No rooms found
                             </Text>
-                            <Text className={`text-sm mt-2 ${isDark ? 'text-gray-500' : 'text-gray-500'} text-center px-8`}>
+                            <Text className="text-sm mt-2 text-txtMuted text-center px-8">
                                 {selectedBuilding ? 'Try selecting a different building or add a new room' : 'Add your first room to get started'}
                             </Text>
                         </View>
                     ) : (
                         <View>
-                            <Text className={`text-xs font-semibold uppercase mb-3 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                            <Text className="text-xs font-semibold uppercase mb-3 text-txtMuted">
                                 {rooms.length} Room{rooms.length !== 1 ? 's' : ''} Found
                             </Text>
                             {rooms.map(room => (
@@ -867,17 +872,17 @@ export default function AdminNavigationManagement() {
                 ) : (
                     connections.length === 0 ? (
                         <View className="items-center justify-center py-16">
-                            <Ionicons name="git-network-outline" size={64} color={isDark ? '#4B5563' : '#D1D5DB'} />
-                            <Text className={`text-lg font-semibold mt-4 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                            <Ionicons name="git-network-outline" size={64} color={iconDim} />
+                            <Text className="text-lg font-semibold mt-4 text-txt">
                                 No connections found
                             </Text>
-                            <Text className={`text-sm mt-2 ${isDark ? 'text-gray-500' : 'text-gray-500'} text-center px-8`}>
+                            <Text className="text-sm mt-2 text-txtMuted text-center px-8">
                                 {selectedBuilding ? 'Try selecting a different building or add a new connection' : 'Add your first connection to get started'}
                             </Text>
                         </View>
                     ) : (
                         <View>
-                            <Text className={`text-xs font-semibold uppercase mb-3 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                            <Text className="text-xs font-semibold uppercase mb-3 text-txtMuted">
                                 {connections.length} Connection{connections.length !== 1 ? 's' : ''} Found
                             </Text>
                             {connections.map(connection => (
@@ -886,24 +891,24 @@ export default function AdminNavigationManagement() {
                         </View>
                     )
                 )}
-                
+
                 <View className="h-20" />
             </ScrollView>
-            
+
             {/* Modals */}
-            <AddRoomModal 
+            <AddRoomModal
                 visible={showAddRoomModal}
                 onClose={() => setShowAddRoomModal(false)}
                 onAdd={loadData}
                 buildings={buildings}
             />
-            
+
             <AddConnectionModal
                 visible={showAddConnectionModal}
                 onClose={() => setShowAddConnectionModal(false)}
                 onAdd={loadData}
                 rooms={rooms}
             />
-        </View>
+        </SafeAreaView>
     );
 }

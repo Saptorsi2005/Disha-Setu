@@ -2,8 +2,8 @@
  * app/(tabs)/home.jsx — Real project feed from backend
  */
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, ActivityIndicator, RefreshControl } from 'react-native';
-import { useRouter } from 'expo-router';
+import { View, Text, ScrollView, TouchableOpacity, Image, ActivityIndicator, RefreshControl, Alert } from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocation } from '../../hooks/use-location';
@@ -102,7 +102,28 @@ export default function HomeScreen() {
     const { isDark } = useColorScheme();
     const iconDim = isDark ? '#9CA3AF' : '#6B7280';
 
-    const { coords, label, mode, startGPS, setManual } = useLocation();
+    const { coords, label, mode, startGPS, setManual, isLocationEnabled, checkLocationPreference } = useLocation();
+
+    useFocusEffect(
+        useCallback(() => {
+            checkLocationPreference();
+        }, [checkLocationPreference])
+    );
+
+    const handleUseGPS = async () => {
+        if (!isLocationEnabled) {
+            Alert.alert(
+                t('home.location_disabled', 'Location Services Disabled'),
+                t('home.turn_on_location_prompt', 'Please turn on the location service in settings to see nearby projects.'),
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Go to Settings', onPress: () => router.push({ pathname: '/settings', params: { highlight: 'location' } }) }
+                ]
+            );
+            return;
+        }
+        await startGPS();
+    };
 
     const loadProjects = useCallback(async (lat, lng) => {
         try {
@@ -202,7 +223,7 @@ export default function HomeScreen() {
                     <View className="flex-row items-center gap-2 px-3 py-2 rounded-lg border border-[#6366F1]/30 bg-[#6366F1]/8">
                         <Ionicons name="information-circle-outline" size={14} color="#6366F1" />
                         <Text className="text-[#6366F1] flex-1 text-xs">{t('home.sim_active')}</Text>
-                        <TouchableOpacity onPress={startGPS}>
+                        <TouchableOpacity onPress={handleUseGPS}>
                             <Text className="text-[#00D4AA] text-xs font-semibold">{t('home.use_gps')}</Text>
                         </TouchableOpacity>
                     </View>
@@ -241,7 +262,21 @@ export default function HomeScreen() {
                     </View>
                 ) : viewMode === 'map' ? (
                     <View className="flex-1 bg-surface relative m-3 mb-20 rounded-2xl overflow-hidden border border-cardBorder">
-                        {coords && (
+                        {!isLocationEnabled ? (
+                            <View className="flex-1 items-center justify-center bg-card px-8">
+                                <Ionicons name="location-outline" size={44} color={iconDim} />
+                                <Text className="text-txt font-bold text-center text-lg mt-4">{t('home.location_disabled', 'Location Services Disabled')}</Text>
+                                <Text className="text-txtMuted text-sm text-center mt-2 leading-5">
+                                    {t('home.turn_on_location_prompt', 'Please turn on the location service in settings to see nearby projects.')}
+                                </Text>
+                                <TouchableOpacity 
+                                    className="mt-6 bg-[#00D4AA] px-6 py-2.5 rounded-xl border border-[#00D4AA]/50"
+                                    onPress={() => router.push({ pathname: '/settings', params: { highlight: 'location' } })}
+                                >
+                                    <Text className="text-black font-bold text-sm tracking-wide">Go to Settings</Text>
+                                </TouchableOpacity>
+                            </View>
+                        ) : coords ? (
                             <MapView
                                 style={{ flex: 1, width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
                                 userInterfaceStyle="light"
@@ -273,8 +308,7 @@ export default function HomeScreen() {
                                     </Marker>
                                 ))}
                             </MapView>
-                        )}
-                        {!coords && (
+                        ) : (
                             <View className="flex-1 items-center justify-center bg-card">
                                 <ActivityIndicator size="small" color="#00D4AA" />
                                 <Text className="text-txtMuted text-xs mt-3">{t('home.waiting_location', 'Awaiting location...')}</Text>

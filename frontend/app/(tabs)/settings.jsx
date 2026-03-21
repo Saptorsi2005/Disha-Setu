@@ -1,56 +1,86 @@
-import { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Switch, Image, ActivityIndicator } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Switch, Image, ActivityIndicator, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useColorScheme } from '../../hooks/use-color-scheme';
 import { useAuth } from '../../context/AuthContext';
 import { logout as authLogout, fetchMe } from '../../services/authService';
 import { disconnectSocket } from '../../services/socketService';
 import { useTranslation } from 'react-i18next';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 function SectionHeader({ title }) {
     return <Text className="text-txt text-sm font-semibold mb-2 mt-1">{title}</Text>;
 }
 
-function SettingRow({ icon, title, subtitle, value, type = 'nav', danger, onPress, action }) {
+function SettingRow({ icon, title, subtitle, value, type = 'nav', danger, onPress, action, isHighlighted }) {
     const { isDark } = useColorScheme();
     const iconDim = isDark ? '#9CA3AF' : '#6B7280';
+    const highlightAnim = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        if (isHighlighted) {
+            Animated.sequence([
+                Animated.timing(highlightAnim, {
+                    toValue: 1,
+                    duration: 300,
+                    useNativeDriver: false,
+                }),
+                Animated.delay(1400),
+                Animated.timing(highlightAnim, {
+                    toValue: 0,
+                    duration: 600,
+                    useNativeDriver: false,
+                })
+            ]).start();
+        }
+    }, [isHighlighted, highlightAnim]);
+
+    const backgroundColor = highlightAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['rgba(0, 212, 170, 0)', 'rgba(0, 212, 170, 0.2)']
+    });
 
     return (
-        <TouchableOpacity
-            className={`flex-row items-center py-3.5 border-b border-cardBorder last:border-0`}
-            onPress={onPress}
-            disabled={type === 'switch'}
-            activeOpacity={0.7}
-        >
-            <View className={`w-8 h-8 rounded-lg items-center justify-center mr-3 ${danger ? 'bg-[#EF4444]/10' : 'bg-surface'}`}>
-                <Ionicons name={icon} size={17} color={danger ? '#EF4444' : iconDim} />
-            </View>
-            <View className="flex-1 justify-center">
-                <Text className={`text-sm font-medium ${danger ? 'text-[#EF4444]' : 'text-txt'}`}>{title}</Text>
-                {subtitle && <Text className="text-txtMuted text-xs mt-0.5">{subtitle}</Text>}
-            </View>
-            {type === 'nav' && (
-                <View className="flex-row items-center gap-1">
-                    {value && <Text className="text-txtMuted text-sm">{value}</Text>}
-                    <Ionicons name="chevron-forward" size={16} color={iconDim} />
+        <Animated.View style={{ backgroundColor, borderRadius: 8, marginHorizontal: -12, paddingHorizontal: 12 }}>
+            <TouchableOpacity
+                className={`flex-row items-center py-3.5 border-b border-cardBorder last:border-0`}
+                onPress={onPress}
+                disabled={type === 'switch'}
+                activeOpacity={0.7}
+            >
+                <View className={`w-8 h-8 rounded-lg items-center justify-center mr-3 ${danger ? 'bg-[#EF4444]/10' : 'bg-surface'}`}>
+                    <Ionicons name={icon} size={17} color={danger ? '#EF4444' : iconDim} />
                 </View>
-            )}
-            {type === 'switch' && action}
-            {type === 'link' && <Ionicons name="open-outline" size={16} color={iconDim} />}
-        </TouchableOpacity>
+                <View className="flex-1 justify-center">
+                    <Text className={`text-sm font-medium ${danger ? 'text-[#EF4444]' : 'text-txt'}`}>{title}</Text>
+                    {subtitle && <Text className="text-txtMuted text-xs mt-0.5">{subtitle}</Text>}
+                </View>
+                {type === 'nav' && (
+                    <View className="flex-row items-center gap-1">
+                        {value && <Text className="text-txtMuted text-sm">{value}</Text>}
+                        <Ionicons name="chevron-forward" size={16} color={iconDim} />
+                    </View>
+                )}
+                {type === 'switch' && action}
+                {type === 'link' && <Ionicons name="open-outline" size={16} color={iconDim} />}
+            </TouchableOpacity>
+        </Animated.View>
     );
 }
 
 export default function SettingsScreen() {
     const router = useRouter();
+    const { highlight } = useLocalSearchParams();
     const { isDark, toggleColorScheme } = useColorScheme();
     const { user, logout } = useAuth();
     const { t, i18n } = useTranslation();
     const [profileData, setProfileData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [showLangPicker, setShowLangPicker] = useState(false);
+    const [locationEnabled, setLocationEnabled] = useState(true);
+    const [highlightLocation, setHighlightLocation] = useState(false);
     const iconDim = isDark ? '#9CA3AF' : '#6B7280';
 
     const languages = [
@@ -76,7 +106,28 @@ export default function SettingsScreen() {
         fetchMe()
             .then(data => { setProfileData(data); setLoading(false); })
             .catch(() => { setProfileData(user); setLoading(false); });
+
+        AsyncStorage.getItem('location_permission_enabled').then(val => {
+            if (val !== null) setLocationEnabled(val === 'true');
+        });
     }, [user]);
+
+    useEffect(() => {
+        if (highlight === 'location') {
+            setHighlightLocation(true);
+            const timer = setTimeout(() => setHighlightLocation(false), 2500);
+            return () => clearTimeout(timer);
+        }
+    }, [highlight]);
+
+    const toggleLocation = async (value) => {
+        setLocationEnabled(value);
+        try {
+            await AsyncStorage.setItem('location_permission_enabled', value.toString());
+        } catch (e) {
+            console.error('Failed to save location preference', e);
+        }
+    };
 
     const handleLogout = async () => {
         disconnectSocket();
@@ -142,12 +193,13 @@ export default function SettingsScreen() {
                         <SettingRow
                             icon="location-outline"
                             title={t('settings.location')}
-                            subtitle="Required for geo-fencing"
+                            subtitle="Required for geo-fencing and maps"
                             type="switch"
+                            isHighlighted={highlightLocation}
                             action={
                                 <Switch
-                                    value={true}
-                                    onValueChange={() => { }}
+                                    value={locationEnabled}
+                                    onValueChange={toggleLocation}
                                     trackColor={{ false: '#374151', true: '#00D4AA' }}
                                     thumbColor="#fff"
                                 />
