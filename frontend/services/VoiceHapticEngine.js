@@ -1,0 +1,84 @@
+import * as Speech from 'expo-speech';
+import * as Haptics from 'expo-haptics';
+
+export const VoiceHapticEngine = {
+    /**
+     * Triggers voice instructions and haptic vibrations based on the navigation step
+     * @param {Object} step - The direction step object from the routing engine
+     * @param {string} language - 'en' (English) or 'hi' (Hindi)
+     */
+    triggerInstruction(step, language = 'en') {
+        if (!step) return;
+
+        const { instruction, roomType, roomName } = step;
+
+        let actionKey = 'STRAIGHT'; // default
+
+        if (instruction.includes('Arrive')) {
+            actionKey = 'ARRIVED';
+        } else if (instruction.includes('Start')) {
+            actionKey = 'START';
+        } else if (roomType === 'elevator') {
+            actionKey = 'ELEVATOR';
+        } else if (roomType === 'stairs') {
+            actionKey = 'STAIRS';
+        } else if (instruction.includes('left') || instruction.includes('Left')) {
+            actionKey = 'LEFT_TURN';
+        } else if (instruction.includes('right') || instruction.includes('Right')) {
+            actionKey = 'RIGHT_TURN';
+        }
+
+        // Clean the instruction string by removing text inside brackets like "(Floor 0)"
+        const cleanInstructionStr = instruction.replace(/\s*\(.*?\)\s*/g, '').trim();
+
+        const dictionary = {
+            'LEFT_TURN': { 
+                speech: { en: cleanInstructionStr, hi: 'Aage se baaye mudiye' },
+                haptic: [Haptics.ImpactFeedbackStyle.Medium, Haptics.ImpactFeedbackStyle.Medium] // 2 short bumps
+            },
+            'RIGHT_TURN': {
+                speech: { en: cleanInstructionStr, hi: 'Aage se daaye mudiye' },
+                haptic: [Haptics.ImpactFeedbackStyle.Heavy] // 1 long heavy bump
+            },
+            'ELEVATOR': {
+                speech: { en: cleanInstructionStr, hi: 'Lift lijiye' },
+                haptic: [Haptics.ImpactFeedbackStyle.Light, Haptics.ImpactFeedbackStyle.Medium, Haptics.ImpactFeedbackStyle.Light]
+            },
+            'STAIRS': {
+                speech: { en: cleanInstructionStr, hi: 'Seedhiyon se jaiye' },
+                haptic: [Haptics.ImpactFeedbackStyle.Medium, Haptics.ImpactFeedbackStyle.Light]
+            },
+            'STRAIGHT': {
+                speech: { en: cleanInstructionStr, hi: `Seedha ${roomName} ki taraf jaiye` },
+                haptic: null
+            },
+            'START': {
+                speech: { en: cleanInstructionStr, hi: `${roomName} se shuruat karein.` },
+                haptic: [Haptics.NotificationFeedbackType.Success]
+            },
+            'ARRIVED': {
+                speech: { en: cleanInstructionStr, hi: `Aap ${roomName} pahunch gaye hain` },
+                haptic: [Haptics.NotificationFeedbackType.Success] // Long success pulse
+            }
+        };
+
+        const action = dictionary[actionKey];
+        if (!action) return;
+
+        // Trigger Voice TTS
+        Speech.speak(action.speech[language]);
+
+        // Trigger Haptic Vibration Patterns
+        if (action.haptic) {
+            action.haptic.forEach((style, index) => {
+                setTimeout(() => {
+                    if (typeof style === 'number') {
+                        Haptics.notificationAsync(style);
+                    } else {
+                        Haptics.impactAsync(style);
+                    }
+                }, index * 300); // stagger multiple bumps by 300ms
+            });
+        }
+    }
+};

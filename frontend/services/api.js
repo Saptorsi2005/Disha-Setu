@@ -23,6 +23,7 @@ const getBaseUrl = () => {
         return process.env.EXPO_PUBLIC_API_URL;
     }
 
+
     // 2. Web always uses localhost
     if (Platform.OS === 'web') {
         return `http://localhost:${BACKEND_PORT}/api`;
@@ -42,6 +43,11 @@ const getBaseUrl = () => {
 
     // 4. Last resort fallback (should rarely reach here)
     return `http://localhost:${BACKEND_PORT}/api`;
+
+    // For mobile (Android/iOS) - use your computer's IP
+    // Find your IP by running: ipconfig (Windows) or ifconfig (Mac/Linux)
+    return 'http://10.198.122.140:3000/api';
+
 };
 
 export const BASE_URL = getBaseUrl();
