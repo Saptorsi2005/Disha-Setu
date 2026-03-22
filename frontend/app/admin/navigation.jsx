@@ -8,7 +8,7 @@ import { useRouter } from 'expo-router';
 import { useState, useEffect, useCallback } from 'react';
 import { useColorScheme } from '../../hooks/use-color-scheme';
 import { useAuth } from '../../context/AuthContext';
-import { getNavigationData, deleteRoom, deleteConnection, addRoom, addConnection } from '../../services/adminService';
+import { getNavigationData, deleteRoom, deleteConnection, addRoom, addConnection, getAllIncidents, createIncident, toggleIncident, deleteIncident } from '../../services/adminService';
 import { getBuildings, fetchBuildingFloors } from '../../services/indoorNavigationService';
 import { apiFetch } from '../../services/api';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -687,6 +687,80 @@ export default function AdminNavigationManagement() {
     const [activeTab, setActiveTab] = useState('rooms');
     const [showAddRoomModal, setShowAddRoomModal] = useState(false);
     const [showAddConnectionModal, setShowAddConnectionModal] = useState(false);
+
+    // --- Missing Incident State Variables & Constants ---
+    const INCIDENT_TYPES = ['lift_down', 'room_closed', 'blocked_path', 'maintenance'];
+    const INCIDENT_SEVERITIES = ['high', 'medium', 'low'];
+    const [incidentForm, setIncidentForm] = useState({ type: 'lift_down', severity: 'medium', message: '', room_id: '' });
+    const [showIncidentTypePicker, setShowIncidentTypePicker] = useState(false);
+    const [showIncidentSeverityPicker, setShowIncidentSeverityPicker] = useState(false);
+    const [incidentSaving, setIncidentSaving] = useState(false);
+
+    const loadIncidents = async () => {
+        try {
+            const res = await getAllIncidents(selectedBuilding?.id || null);
+            if (res && res.data) {
+                setIncidents(res.data);
+            }
+        } catch (e) {
+            console.error('Failed to load incidents:', e);
+            Alert.alert('Error', 'Failed to fetch layout incidents.');
+        }
+    };
+
+    const handleCreateIncident = async () => {
+        if (!incidentForm.type || !incidentForm.message.trim()) {
+            return Alert.alert('Error', 'Type and Message are required fields.');
+        }
+        
+        setIncidentSaving(true);
+        try {
+            await createIncident({
+                type: incidentForm.type,
+                severity: incidentForm.severity,
+                message: incidentForm.message.trim(),
+                room_id: incidentForm.room_id.trim() || null
+            });
+            Alert.alert('Success', 'Incident placed successfully');
+            setIncidentForm({ type: 'lift_down', severity: 'medium', message: '', room_id: '' });
+            await loadIncidents();
+        } catch (e) {
+            console.error('Incident create err:', e);
+            Alert.alert('Error', e.message || 'Failed to submit incident');
+        } finally {
+            setIncidentSaving(false);
+        }
+    };
+
+    const handleDeleteIncident = async (inc) => {
+        Alert.alert('Delete Incident', 'Permanently remove this incident log?', [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+                text: 'Delete', 
+                style: 'destructive',
+                onPress: async () => {
+                    try {
+                        await deleteIncident(inc.id);
+                        await loadIncidents();
+                    } catch (e) {
+                        console.error('Delete incident error:', e);
+                        Alert.alert('Error', 'Failed to remove incident');
+                    }
+                }
+            }
+        ]);
+    };
+
+    const handleToggleIncident = async (inc) => {
+        try {
+            await toggleIncident(inc.id, !inc.is_active);
+            await loadIncidents();
+        } catch (e) {
+            console.error('Toggle err:', e);
+            Alert.alert('Error', 'Failed to change incident activity state.');
+        }
+    };
+    // ----------------------------------------------------
 
     const loadData = useCallback(async () => {
         try {

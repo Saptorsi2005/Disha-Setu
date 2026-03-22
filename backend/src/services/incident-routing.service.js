@@ -53,6 +53,34 @@ async function getActiveIncidents(buildingId = null) {
     return result.rows;
 }
 
+/**
+ * Fetch all incidents (Admin only - active and inactive)
+ */
+async function getAllIncidents(buildingId = null) {
+    let sql = `
+        SELECT ni.*, r.name AS room_name, r.type AS room_type
+        FROM navigation_incidents ni
+        LEFT JOIN rooms r ON ni.room_id = r.id
+    `;
+    const params = [];
+
+    if (buildingId) {
+        sql += `
+            WHERE ni.room_id IS NULL OR ni.room_id IN (
+                SELECT r2.id FROM rooms r2
+                JOIN floors f ON r2.floor_id = f.id
+                WHERE f.building_id = $1
+            )
+        `;
+        params.push(buildingId);
+    }
+
+    sql += ' ORDER BY ni.is_active DESC, ni.severity DESC, ni.created_at DESC';
+
+    const result = await query(sql, params);
+    return result.rows;
+}
+
 /** Invalidate the cache (e.g., after creating/updating an incident) */
 function invalidateCache() {
     incidentCache = null;
@@ -205,10 +233,37 @@ async function resolveIncident(id) {
     return result.rows[0];
 }
 
+/**
+ * Toggle incident active state
+ */
+async function toggleIncident(id, isActive) {
+    const result = await query(
+        `UPDATE navigation_incidents SET is_active = $2 WHERE id = $1 RETURNING *`,
+        [id, isActive]
+    );
+    invalidateCache();
+    return result.rows[0];
+}
+
+/**
+ * Delete an incident
+ */
+async function deleteIncident(id) {
+    const result = await query(
+        `DELETE FROM navigation_incidents WHERE id = $1 RETURNING id`,
+        [id]
+    );
+    invalidateCache();
+    return result.rows[0];
+}
+
 module.exports = {
     findIncidentAwareRoute,
     getActiveIncidents,
+    getAllIncidents,
     createIncident,
     resolveIncident,
+    toggleIncident,
+    deleteIncident,
     invalidateCache,
 };

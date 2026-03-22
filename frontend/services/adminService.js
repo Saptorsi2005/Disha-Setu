@@ -104,6 +104,36 @@ export const addFloor = async (floorData) => {
 };
 
 /**
+ * Admin Incident Management
+ */
+export const getAllIncidents = async (buildingId = null) => {
+    const url = buildingId 
+        ? `/navigation/incidents/all?building_id=${buildingId}`
+        : '/navigation/incidents/all';
+    return await apiFetch(url);
+};
+
+export const createIncident = async (incidentData) => {
+    return await apiFetch('/navigation/incidents', {
+        method: 'POST',
+        body: JSON.stringify(incidentData)
+    });
+};
+
+export const toggleIncident = async (id, isActive) => {
+    return await apiFetch(`/navigation/incidents/${id}/toggle`, {
+        method: 'PATCH',
+        body: JSON.stringify({ is_active: isActive })
+    });
+};
+
+export const deleteIncident = async (id) => {
+    return await apiFetch(`/navigation/incidents/${id}`, {
+        method: 'DELETE'
+    });
+};
+
+/**
  * User Management
  */
 export const getAllUsers = async (params = {}) => {

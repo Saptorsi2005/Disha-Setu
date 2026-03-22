@@ -49,6 +49,20 @@ async function getActiveIncidents(req, res, next) {
 }
 
 /**
+ * GET /api/navigation/incidents/all
+ * Returns ALL incidents (Admin only). Optionally filter by building_id.
+ */
+async function getAllIncidents(req, res, next) {
+    try {
+        const { building_id } = req.query;
+        const incidents = await incidentService.getAllIncidents(building_id || null);
+        return res.json({ success: true, data: incidents });
+    } catch (err) {
+        next(err);
+    }
+}
+
+/**
  * POST /api/navigation/incidents
  * Create a new incident.
  * Body: { type, room_id, connection_id, message, severity }
@@ -81,4 +95,43 @@ async function resolveIncident(req, res, next) {
     }
 }
 
-module.exports = { getIncidentAwareRoute, getActiveIncidents, createIncident, resolveIncident };
+/**
+ * PATCH /api/navigation/incidents/:id/toggle
+ * Toggle active state.
+ */
+async function toggleIncident(req, res, next) {
+    try {
+        const { id } = req.params;
+        const { is_active } = req.body;
+        const incident = await incidentService.toggleIncident(id, is_active);
+        if (!incident) return res.status(404).json({ error: 'Incident not found' });
+        return res.json({ success: true, data: incident });
+    } catch (err) {
+        next(err);
+    }
+}
+
+/**
+ * DELETE /api/navigation/incidents/:id
+ * Delete an incident permanently.
+ */
+async function deleteIncident(req, res, next) {
+    try {
+        const { id } = req.params;
+        const result = await incidentService.deleteIncident(id);
+        if (!result) return res.status(404).json({ error: 'Incident not found' });
+        return res.json({ success: true, data: result });
+    } catch (err) {
+        next(err);
+    }
+}
+
+module.exports = { 
+    getIncidentAwareRoute, 
+    getActiveIncidents, 
+    getAllIncidents,
+    createIncident, 
+    resolveIncident,
+    toggleIncident,
+    deleteIncident
+};
