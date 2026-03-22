@@ -12,8 +12,25 @@ import { fetchProjects } from '../../services/projectService';
 import { CATEGORY_ICONS } from '../../constants/mockData';
 import { useTranslation } from 'react-i18next';
 
-const CATEGORIES = ['All', 'Road', 'Bridge', 'Metro', 'Hospital', 'College', 'Water', 'Park'];
+const normalize = (val) => val ? String(val).toLowerCase().trim() : null;
 
+const getProjectCategory = (p) => {
+    return p.category || p.type || p.domain || (Array.isArray(p.tags) && p.tags[0] ? p.tags[0] : 'Other');
+};
+
+const getCategoryIcon = (catName) => {
+    const raw = (catName || '').toLowerCase();
+    if (raw.includes('road') || raw.includes('expressway') || raw.includes('highway')) return 'add-road';
+    if (raw.includes('metro') || raw.includes('rail') || raw.includes('corridor')) return 'subway';
+    if (raw.includes('hospital') || raw.includes('health') || raw.includes('medical')) return 'local-hospital';
+    if (raw.includes('college') || raw.includes('school') || raw.includes('education') || raw.includes('university') || raw.includes('institute')) return 'school';
+    if (raw.includes('water') || raw.includes('sewage') || raw.includes('river') || raw.includes('lake') || raw.includes('drainage')) return 'water-drop';
+    if (raw.includes('park') || raw.includes('garden') || raw.includes('green')) return 'park';
+    if (raw.includes('bridge') || raw.includes('sea link')) return 'toll';
+    if (raw.includes('building') || raw.includes('housing') || raw.includes('center') || raw.includes('facility')) return 'domain';
+    if (raw.includes('power') || raw.includes('energy') || raw.includes('solar')) return 'electrical-services';
+    return 'construction';
+};
 const STATUS_COLOR = {
     'In Progress': '#00D4AA',
     'Completed': '#10B981',
@@ -39,15 +56,42 @@ export default function SearchScreen() {
         }).catch(() => setLoading(false));
     }, []);
 
-    const filtered = allProjects.filter(p => {
-        const matchQuery = !query.trim() ||
-            p.name?.toLowerCase().includes(query.toLowerCase()) ||
-            p.area?.toLowerCase().includes(query.toLowerCase()) ||
-            p.district?.toLowerCase().includes(query.toLowerCase()) ||
-            p.id?.toLowerCase().includes(query.toLowerCase());
-        const matchCategory = selectedCategory === 'All' || p.category === selectedCategory;
-        return matchQuery && matchCategory;
-    });
+    const dynamicCategories = useMemo(() => {
+        const cats = new Set();
+        allProjects.forEach(p => {
+            const cat = getProjectCategory(p);
+            if (cat && cat !== 'Other') cats.add(normalize(cat));
+        });
+        
+        const unique = Array.from(cats)
+            .filter(Boolean)
+            .map(c => c.charAt(0).toUpperCase() + c.slice(1));
+            
+        return ['All', ...unique];
+    }, [allProjects]);
+
+    const filtered = useMemo(() => {
+        const selCat = normalize(selectedCategory);
+        const q = normalize(query) || '';
+
+        return allProjects.filter(p => {
+            // Category strict check
+            const projectCat = normalize(getProjectCategory(p));
+            const matchCategory = selCat === 'all' || projectCat === selCat;
+
+            if (!matchCategory) return false;
+
+            // Search query check
+            if (!q) return true;
+
+            return normalize(p.name)?.includes(q) ||
+                   normalize(p.description)?.includes(q) ||
+                   normalize(p.city)?.includes(q) ||
+                   normalize(p.area)?.includes(q) ||
+                   normalize(p.district)?.includes(q) ||
+                   normalize(p.id)?.includes(q);
+        });
+    }, [allProjects, selectedCategory, query]);
 
     return (
         <SafeAreaView className="flex-1 bg-main" edges={['top']}>
@@ -77,7 +121,7 @@ export default function SearchScreen() {
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={{ paddingHorizontal: 16, alignItems: 'center', gap: 6 }}
                 >
-                    {CATEGORIES.map(cat => {
+                    {dynamicCategories.map(cat => {
                         const active = selectedCategory === cat;
                         return (
                             <TouchableOpacity
@@ -128,7 +172,8 @@ export default function SearchScreen() {
                     ) : (
                         <View className="bg-card rounded-xl border border-cardBorder overflow-hidden">
                             {filtered.map((project, idx) => {
-                                const iconName = CATEGORY_ICONS[project.category] || 'construction';
+                                const pCat = getProjectCategory(project);
+                                const iconName = getCategoryIcon(pCat);
                                 const progress = project.progress_percentage ?? project.progress ?? 0;
                                 const statusColor = STATUS_COLOR[project.status] || '#6B7280';
                                 const isLast = idx === filtered.length - 1;
