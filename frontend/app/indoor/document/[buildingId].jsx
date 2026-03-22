@@ -12,7 +12,10 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as DocumentPicker from 'expo-document-picker';
-import { apiFetch } from '../../../services/api';
+import { apiFetch, BASE_URL } from '../../../services/api';
+
+// Derive server root (e.g. http://192.168.x.x:3000) from auto-detected BASE_URL
+const SERVER_ROOT = BASE_URL.replace(/\/api\/?$/, '');
 
 const EXAMPLE_INTENTS = [
     'Blood test required. OPD consultation. Pharmacy for medication.',
@@ -96,7 +99,6 @@ export default function DocumentNavigationScreen() {
 
         setMode('loading');
         try {
-            const apiBase = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
             const formData = new FormData();
             formData.append('building_id', buildingId);
 
@@ -124,7 +126,7 @@ export default function DocumentNavigationScreen() {
             }
 
             const response = await fetch(
-                `${apiBase}/api/navigation/analyze-document`,
+                `${SERVER_ROOT}/api/navigation/analyze-document`,
                 { method: 'POST', body: formData }
             );
             const data = await response.json();

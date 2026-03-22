@@ -7,7 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
-const BACKEND_PORT = 3000;
+const BACKEND_PORT = parseInt(process.env.EXPO_PUBLIC_BACKEND_PORT) || 3000;
 
 /**
  * Automatically resolve the backend URL:

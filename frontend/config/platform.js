@@ -4,6 +4,7 @@
  * Ensures compatibility across Web and Expo Go
  */
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
 /**
  * Platform detection utilities
@@ -16,14 +17,28 @@ export const IS_NATIVE = IS_IOS || IS_ANDROID;
 /**
  * Environment configuration
  */
+const BACKEND_PORT = parseInt(process.env.EXPO_PUBLIC_BACKEND_PORT) || 3000;
+
+// Auto-detect the backend host from Expo's Metro bundler host
+// (e.g. "192.168.x.x:8081" → "192.168.x.x"), so no manual IP changes needed
+const getAutoHost = () => {
+  if (Platform.OS === 'web') return 'localhost';
+  const expoHost =
+    Constants.expoConfig?.hostUri ||
+    Constants.manifest2?.extra?.expoClient?.hostUri ||
+    Constants.manifest?.debuggerHost;
+  return expoHost ? expoHost.split(':')[0] : 'localhost';
+};
+
 const getApiBaseUrl = () => {
-  if (IS_WEB) return 'http://localhost:3000/api';
-  return 'http://192.168.31.95:3000/api'; // Your computer's IP
+  if (process.env.EXPO_PUBLIC_API_URL) return process.env.EXPO_PUBLIC_API_URL;
+  return `http://${getAutoHost()}:${BACKEND_PORT}/api`;
 };
 
 const getSocketUrl = () => {
-  if (IS_WEB) return 'http://localhost:3000';
-  return 'http://192.168.31.95:3000'; // Your computer's IP
+  const base = process.env.EXPO_PUBLIC_API_URL;
+  if (base) return base.replace(/\/api\/?$/, '');
+  return `http://${getAutoHost()}:${BACKEND_PORT}`;
 };
 
 export const config = {

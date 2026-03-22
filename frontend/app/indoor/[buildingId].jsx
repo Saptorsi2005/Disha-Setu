@@ -19,6 +19,10 @@ import {
     getIncidentRoute,
     getActiveIncidents,
 } from '../../services/indoorNavigationService';
+import { BASE_URL } from '../../services/api';
+
+// Derive the server root (e.g. http://192.168.x.x:3000) from the auto-detected BASE_URL
+const SERVER_ROOT = BASE_URL.replace(/\/api\/?$/, '');
 
 const ROOM_TYPE_ICONS = {
     entrance: 'enter-outline',
@@ -437,7 +441,7 @@ export default function IndoorNavigationScreen() {
         }
         setSmartMode('loading');
         try {
-            const apiBase = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+            // Use SERVER_ROOT (auto-detected from BASE_URL) so this works on Android without manual IP
             const formData = new FormData();
             formData.append('building_id', buildingId);
             if (smartFile) {
@@ -453,7 +457,7 @@ export default function IndoorNavigationScreen() {
             } else {
                 formData.append('text', smartText);
             }
-            const response = await fetch(`${apiBase}/api/navigation/analyze-document`, { method: 'POST', body: formData });
+            const response = await fetch(`${SERVER_ROOT}/api/navigation/analyze-document`, { method: 'POST', body: formData });
             const data = await response.json();
             if (response.ok) { setSmartResult(data); setSmartMode('result'); }
             else throw new Error(data.error || 'Analysis failed');
