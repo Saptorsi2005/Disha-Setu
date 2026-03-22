@@ -9,7 +9,8 @@ import { View, Platform } from 'react-native';
 import { useEffect } from 'react';
 import { useColorScheme } from '../hooks/use-color-scheme';
 import { AuthProvider } from '../context/AuthContext';
-import { connectSocket } from '../services/socketService';
+import { useAuth } from '../context/AuthContext';
+import { connectSocket, disconnectSocket } from '../services/socketService';
 import '../global.css';
 import '../i18n';
 
@@ -19,11 +20,15 @@ export const unstable_settings = {
 
 function AppShell() {
   const { isDark } = useColorScheme();
+  const { user } = useAuth();
 
+  // Reconnect socket whenever auth state changes (login / logout / guest login)
+  // This ensures the socket always carries the latest auth token
   useEffect(() => {
-    // Delay socket connection for Expo Go compatibility
-    // AsyncStorage needs time to initialize on native platforms
     const connectionDelay = Platform.OS === 'web' ? 0 : 500;
+
+    // Disconnect any existing (unauthenticated) socket first
+    disconnectSocket();
 
     const timer = setTimeout(() => {
       connectSocket()
@@ -32,12 +37,11 @@ function AppShell() {
         })
         .catch(err => {
           console.warn('[Layout] Socket connect error:', err?.message || 'Unknown error');
-          // App continues to work without socket - graceful degradation
         });
     }, connectionDelay);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [user]); // re-run when user logs in/out
 
   return (
     <View style={{ flex: 1 }} className={isDark ? 'dark' : ''}>

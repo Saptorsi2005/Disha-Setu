@@ -179,7 +179,13 @@ export default function AuthScreen() {
             login(data.user);
             router.replace('/(tabs)/home');
         } catch (err) {
-            router.replace('/(tabs)/home');
+            // Show error — don't silently navigate; user won't have a valid session
+            Alert.alert(
+                'Cannot Connect',
+                'Unable to reach the server. Please check your internet connection and try again.\n\n' +
+                (err.message || 'Network request failed'),
+                [{ text: 'OK' }]
+            );
         } finally {
             setLoading(false);
         }

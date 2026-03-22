@@ -1,21 +1,47 @@
 /**
  * services/api.js
  * Base HTTP client — all API calls go through here
- * Expo Go compatible with error handling
+ * Expo Go compatible with automatic host detection
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
-// Platform-aware API URL
-// For Android/iOS: Use your computer's local IP (same network)
-// For Web: Use localhost
+const BACKEND_PORT = 3000;
+
+/**
+ * Automatically resolve the backend URL:
+ * 1. If EXPO_PUBLIC_API_URL is set (e.g. in .env for production), use it.
+ * 2. On web: use localhost.
+ * 3. On Android/iOS in Expo Go: extract the host IP from Expo's debugger host
+ *    (e.g. "192.168.31.95:8081" → "http://192.168.31.95:3000/api").
+ *    This works automatically for every developer on any Wi-Fi network.
+ */
 const getBaseUrl = () => {
-    if (Platform.OS === 'web') {
-        return 'http://localhost:3000/api';
+    // 1. Hard override via env (for staged/prod deployments)
+    if (process.env.EXPO_PUBLIC_API_URL) {
+        return process.env.EXPO_PUBLIC_API_URL;
     }
-    // For mobile (Android/iOS) - use your computer's IP
-    // Find your IP by running: ipconfig (Windows) or ifconfig (Mac/Linux)
-    return 'http://192.168.0.101:3000/api';
+
+    // 2. Web always uses localhost
+    if (Platform.OS === 'web') {
+        return `http://localhost:${BACKEND_PORT}/api`;
+    }
+
+    // 3. Auto-detect from Expo's Metro host (works in Expo Go on any network)
+    //    Constants.expoConfig.hostUri looks like "192.168.x.x:8081"
+    const expoHost =
+        Constants.expoConfig?.hostUri ||       // SDK 46+
+        Constants.manifest2?.extra?.expoClient?.hostUri || // older builds
+        Constants.manifest?.debuggerHost;      // legacy SDK
+
+    if (expoHost) {
+        const ip = expoHost.split(':')[0]; // strip the Metro port
+        return `http://${ip}:${BACKEND_PORT}/api`;
+    }
+
+    // 4. Last resort fallback (should rarely reach here)
+    return `http://localhost:${BACKEND_PORT}/api`;
 };
 
 export const BASE_URL = getBaseUrl();
