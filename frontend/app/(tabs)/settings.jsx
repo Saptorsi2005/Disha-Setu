@@ -103,9 +103,22 @@ export default function SettingsScreen() {
     };
 
     useEffect(() => {
+        // ✅ STOP API call after logout
+        if (!user) {
+            setProfileData(null);
+            setLoading(false);
+            return;
+        }
+
         fetchMe()
-            .then(data => { setProfileData(data); setLoading(false); })
-            .catch(() => { setProfileData(user); setLoading(false); });
+            .then(data => {
+                setProfileData(data);
+                setLoading(false);
+            })
+            .catch(() => {
+                setProfileData(user);
+                setLoading(false);
+            });
 
         AsyncStorage.getItem('location_permission_enabled').then(val => {
             if (val !== null) setLocationEnabled(val === 'true');
@@ -131,8 +144,8 @@ export default function SettingsScreen() {
 
     const handleLogout = async () => {
         disconnectSocket();
-        await authLogout();
-        logout();
+        await authLogout(); // backend logout (optional)
+        await logout();     // 🔥 now handles Google too
         router.replace('/auth');
     };
 

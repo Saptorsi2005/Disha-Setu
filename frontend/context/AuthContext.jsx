@@ -4,6 +4,8 @@
  */
 import { createContext, useContext, useState, useEffect } from 'react';
 import { getUser, clearAuth, saveUser } from '../services/authService';
+import { Platform } from 'react-native';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
 const AuthContext = createContext(null);
 
@@ -26,8 +28,20 @@ export function AuthProvider({ children }) {
     };
 
     const logout = async () => {
-        await clearAuth();
-        setUser(null);
+        try {
+            // 🔥 Clear Google session
+            if (Platform.OS === 'android') {
+                await GoogleSignin.revokeAccess();
+                await GoogleSignin.signOut();
+            }
+
+            // Clear app auth
+            await clearAuth();
+            setUser(null);
+
+        } catch (error) {
+            console.error("Logout error:", error);
+        }
     };
 
     return (
