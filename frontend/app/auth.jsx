@@ -33,7 +33,7 @@ import { sendOTP, verifyOTP, loginWithGoogle, loginAsGuest } from '../services/a
 WebBrowser.maybeCompleteAuthSession();
 
 // Google OAuth Client IDs
-const WEB_CLIENT_ID = '821266969114-kihsrvi0uehnfv265ij0c02av1bl4b5l.apps.googleusercontent.com';
+const WEB_CLIENT_ID = '715183475240-jhb6pcjbabpgjbjc746k2rebll0m3bht.apps.googleusercontent.com';
 const ANDROID_CLIENT_ID = 'YOUR_ANDROID_CLIENT_ID.apps.googleusercontent.com'; // Create in Google Cloud Console
 const IOS_CLIENT_ID = 'YOUR_IOS_CLIENT_ID.apps.googleusercontent.com'; // Create in Google Cloud Console
 
