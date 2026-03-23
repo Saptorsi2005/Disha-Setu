@@ -32,13 +32,17 @@ export function AuthProvider({ children }) {
             // 🔥 Clear Google session
             if (Platform.OS === 'android') {
                 try {
-                    const isSignedIn = await GoogleSignin.isSignedIn();
-                    if (isSignedIn) {
-                        await GoogleSignin.revokeAccess();
-                        await GoogleSignin.signOut();
-                    }
-                } catch (googleError) {
-                    console.log("Google logout skipped/failed:", googleError);
+                    // This forces the account picker to appear next time
+                    await GoogleSignin.revokeAccess();
+                } catch (e) {
+                    console.log("Google revokeAccess skipped/failed:", e);
+                }
+                
+                try {
+                    // This clears the current session
+                    await GoogleSignin.signOut();
+                } catch (e) {
+                    console.log("Google signOut skipped/failed:", e);
                 }
             }
 
