@@ -4,7 +4,12 @@
  */
 import { createContext, useContext, useState, useEffect } from 'react';
 import { getUser, clearAuth, saveUser } from '../services/authService';
+
 import { registerForPushNotificationsAsync } from '../services/notificationService';
+
+import { Platform } from 'react-native';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
+
 
 const AuthContext = createContext(null);
 
@@ -33,8 +38,31 @@ export function AuthProvider({ children }) {
     };
 
     const logout = async () => {
-        await clearAuth();
-        setUser(null);
+        try {
+            // 🔥 Clear Google session
+            if (Platform.OS === 'android') {
+                try {
+                    // This forces the account picker to appear next time
+                    await GoogleSignin.revokeAccess();
+                } catch (e) {
+                    console.log("Google revokeAccess skipped/failed:", e);
+                }
+
+                try {
+                    // This clears the current session
+                    await GoogleSignin.signOut();
+                } catch (e) {
+                    console.log("Google signOut skipped/failed:", e);
+                }
+            }
+
+            // Clear app auth
+            await clearAuth();
+            setUser(null);
+
+        } catch (error) {
+            console.error("Logout error:", error);
+        }
     };
 
     return (

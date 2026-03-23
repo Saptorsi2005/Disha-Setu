@@ -12,15 +12,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
+import * as Device from 'expo-device';
 
 let GoogleSignin = null;
 let statusCodes = null;
-try {
-    const GoogleModule = require('@react-native-google-signin/google-signin');
-    GoogleSignin = GoogleModule.GoogleSignin;
-    statusCodes = GoogleModule.statusCodes;
-} catch (e) {
-    console.log('GoogleSignin native module not found. Falling back to web flow.');
+if (Platform.OS === 'android') {
+    try {
+        const GoogleModule = require('@react-native-google-signin/google-signin');
+        GoogleSignin = GoogleModule.GoogleSignin;
+        statusCodes = GoogleModule.statusCodes;
+    } catch (e) {
+        console.log('GoogleSignin native module not available (Expo Go). Falling back to web flow.');
+    }
 }
 import { useColorScheme } from '../hooks/use-color-scheme';
 import { useAuth } from '../context/AuthContext';
@@ -53,21 +56,17 @@ export default function AuthScreen() {
         if (Platform.OS === 'android' && GoogleSignin) {
             GoogleSignin.configure({
                 webClientId: WEB_CLIENT_ID,
-                offlineAccess: false,
             });
         }
     }, []);
 
-    // Google OAuth hook for Web/Fallback
-    const [request, response, promptAsync] = Google.useAuthRequest({
-        clientId: WEB_CLIENT_ID,
-        webClientId: WEB_CLIENT_ID,
-        androidClientId: WEB_CLIENT_ID,
-        iosClientId: WEB_CLIENT_ID,
-        redirectUri: Platform.OS === 'web'
-            ? 'http://localhost:8081'
-            : undefined,
-    });
+    const isWeb = Platform.OS === 'web';
+
+    const [request, response, promptAsync] = isWeb
+        ? Google.useAuthRequest({
+            webClientId: WEB_CLIENT_ID,
+        })
+        : [null, null, null];
 
     // Handle Google OAuth response
     useEffect(() => {
@@ -188,35 +187,34 @@ export default function AuthScreen() {
 
     // Google Sign-In handler
     const handleGoogleSignIn = async () => {
-        if (Platform.OS === 'android' && GoogleSignin) {
-            try {
+        try {
+            if (Platform.OS === 'android') {
+                if (!GoogleSignin) {
+                    throw new Error("Native module not available");
+                }
+
                 await GoogleSignin.hasPlayServices();
                 const userInfo = await GoogleSignin.signIn();
-                
-                const idToken = userInfo.idToken || userInfo?.data?.idToken;
-                if (idToken) {
-                    await handleGoogleSuccess(idToken);
-                } else {
-                    Alert.alert('Error', 'No ID token received securely from Play Services.');
+
+                const idToken =
+                    userInfo?.data?.idToken ||
+                    userInfo?.idToken;
+
+                if (!idToken) {
+                    console.log("FULL USER INFO:", JSON.stringify(userInfo, null, 2));
+                    throw new Error("No idToken returned from Google");
                 }
-            } catch (error) {
-                if (error.code === statusCodes?.SIGN_IN_CANCELLED) {
-                    console.log('Google Native Sign-In cancelled');
-                } else if (error.code === statusCodes?.IN_PROGRESS) {
-                    console.log('Google Native in progress');
-                } else if (error.code === statusCodes?.PLAY_SERVICES_NOT_AVAILABLE) {
-                    await promptAsync(); // Web fallback
-                } else {
-                    Alert.alert('Sign-In Error', error.message || 'Failed natively.');
-                }
+                return await handleGoogleSuccess(idToken);
             }
-        } else {
-            // Web / Expo Go Fallback flow
-            try {
+            // ONLY for web
+            if (Platform.OS === 'web') {
                 await promptAsync();
-            } catch (err) {
-                Alert.alert('Error', 'Failed to open Google Sign-In context');
             }
+            console.log("UserInfo:", userInfo);
+
+        } catch (error) {
+            console.error(error);
+            Alert.alert("Google Sign-In Failed", error.message);
         }
     };
 

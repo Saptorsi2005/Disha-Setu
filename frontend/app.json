@@ -49,8 +49,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "09df4bed-dfef-4c1c-94a6-4d3dc4df5939"
+        "projectId": "9d185f70-3e6e-4be0-a852-62fcf4d1912b"
       }
-    }
+    },
+    "owner": "dishasetu-team"
   }
 }
