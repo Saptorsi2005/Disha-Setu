@@ -18,34 +18,33 @@ const BACKEND_PORT = parseInt(process.env.EXPO_PUBLIC_BACKEND_PORT) || 3000;
  *    This works automatically for every developer on any Wi-Fi network.
  */
 const getBaseUrl = () => {
-    // 1. Hard override via env (for staged/prod deployments)
+    // 1. Production / env override
     if (process.env.EXPO_PUBLIC_API_URL) {
         return process.env.EXPO_PUBLIC_API_URL;
     }
 
+    // 2. Production safety fallback
+    if (!__DEV__) {
+        console.warn("[API] ⚠️ Missing EXPO_PUBLIC_API_URL in production. Using default backend.");
+        return "https://disha-setu.onrender.com/api";
+    }
 
-    // 2. Web always uses localhost
+    // 3. Development (Expo Go)
     if (Platform.OS === 'web') {
         return `http://localhost:${BACKEND_PORT}/api`;
     }
 
-    // 3. Auto-detect from Expo's Metro host (works in Expo Go on any network)
-    //    Constants.expoConfig.hostUri looks like "192.168.x.x:8081"
     const expoHost =
-        Constants.expoConfig?.hostUri ||       // SDK 46+
-        Constants.manifest2?.extra?.expoClient?.hostUri || // older builds
-        Constants.manifest?.debuggerHost;      // legacy SDK
+        Constants.expoConfig?.hostUri ||
+        Constants.manifest2?.extra?.expoClient?.hostUri ||
+        Constants.manifest?.debuggerHost;
 
     if (expoHost) {
-        const ip = expoHost.split(':')[0]; // strip the Metro port
+        const ip = expoHost.split(':')[0];
         return `http://${ip}:${BACKEND_PORT}/api`;
     }
 
-    // 4. Last resort fallback (Standalone APK missing env file)
-    if (!__DEV__) {
-        console.warn("[API] ⚠️ EXPO_PUBLIC_API_URL not found in production build. Falling back to default Render URL.");
-        return `https://dishasetu-backend.onrender.com/api`;
-    }
+    // LAST fallback (dev only)
     return `http://localhost:${BACKEND_PORT}/api`;
 };
 

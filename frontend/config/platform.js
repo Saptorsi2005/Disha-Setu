@@ -31,13 +31,27 @@ const getAutoHost = () => {
 };
 
 const getApiBaseUrl = () => {
-  if (process.env.EXPO_PUBLIC_API_URL) return process.env.EXPO_PUBLIC_API_URL;
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
+  }
+
+  if (!__DEV__) {
+    console.warn("⚠️ API URL missing in production, using fallback");
+    return "https://disha-setu.onrender.com/api";
+  }
+
   return `http://${getAutoHost()}:${BACKEND_PORT}/api`;
 };
 
 const getSocketUrl = () => {
   const base = process.env.EXPO_PUBLIC_API_URL;
+
   if (base) return base.replace(/\/api\/?$/, '');
+
+  if (!__DEV__) {
+    return "https://disha-setu.onrender.com";
+  }
+
   return `http://${getAutoHost()}:${BACKEND_PORT}`;
 };
 
@@ -74,7 +88,7 @@ export const config = {
   // Authentication configuration
   auth: {
     // Google OAuth configuration pulled from environment variables
-    googleClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '715183475240-jhb6pcjbabpgjbjc746k2rebll0m3bht.apps.googleusercontent.com',
+    googleClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
 
     // OAuth redirect URIs (Dynamic for Web in production)
     redirectUri: IS_WEB ? (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8081') : undefined,
