@@ -19,8 +19,15 @@ let io;
 const initSocket = (httpServer) => {
     io = new Server(httpServer, {
         cors: {
-            origin: '*', // Tighten in production using CORS_ORIGINS
+            origin: (origin, callback) => {
+                const allowedOrigins = (process.env.CORS_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean);
+                if (!origin || allowedOrigins.includes(origin) || /^exp:\/\//.test(origin)) {
+                    return callback(null, true);
+                }
+                return callback(new Error(`CORS blocked: ${origin}`), false);
+            },
             methods: ['GET', 'POST'],
+            credentials: true,
         },
         transports: ['websocket', 'polling'],
     });

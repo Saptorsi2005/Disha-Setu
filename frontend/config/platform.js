@@ -45,44 +45,44 @@ export const config = {
   // API endpoints
   API_BASE_URL: getApiBaseUrl(),
   SOCKET_URL: getSocketUrl(),
-  
+
   // Storage configuration
   storage: {
     // Expo Go doesn't support AsyncStorage encryption
     // Web uses IndexedDB/localStorage bridge
     useEncryption: false,
-    
+
     // Keys
     TOKEN_KEY: 'auth_token',
     USER_KEY: 'auth_user',
   },
-  
+
   // Socket.io configuration
   socket: {
     // Longer timeout for mobile due to AsyncStorage initialization
     connectionTimeout: IS_WEB ? 10000 : 20000,
-    
+
     // Delay socket connection on mobile
     initializationDelay: IS_WEB ? 0 : 500,
-    
+
     // Enable/disable features based on platform
     enableAutoReconnect: true,
     reconnectionAttempts: 5,
     reconnectionDelay: 2000,
   },
-  
+
   // Authentication configuration
   auth: {
-    // Google OAuth configuration
-    googleClientId: '821266969114-kihsrvi0uehnfv265ij0c02av1bl4b5l.apps.googleusercontent.com',
-    
-    // OAuth redirect URIs
-    redirectUri: IS_WEB ? 'http://localhost:8081' : undefined,
-    
+    // Google OAuth configuration pulled from environment variables
+    googleClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '715183475240-jhb6pcjbabpgjbjc746k2rebll0m3bht.apps.googleusercontent.com',
+
+    // OAuth redirect URIs (Dynamic for Web in production)
+    redirectUri: IS_WEB ? (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8081') : undefined,
+
     // Token expiration
     tokenExpiryHours: 720, // 30 days
   },
-  
+
   // Feature flags
   features: {
     // All features supported on all platforms
@@ -92,7 +92,7 @@ export const config = {
     enableGoogleAuth: true,
     enableOTPAuth: true,
     enableGuestAuth: true,
-    
+
     // Socket.io features (graceful degradation if connection fails)
     enableRealtimeUpdates: true,
     enableGeofencing: true,
@@ -114,7 +114,7 @@ export async function initializePlatform() {
   if (IS_NATIVE) {
     console.log('[Platform] Initializing native platform...');
     // Add any native-specific initialization here
-    
+
     // Wait for AsyncStorage to be ready
     await new Promise(resolve => setTimeout(resolve, 100));
   } else {

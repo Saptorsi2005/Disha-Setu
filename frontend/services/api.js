@@ -41,13 +41,12 @@ const getBaseUrl = () => {
         return `http://${ip}:${BACKEND_PORT}/api`;
     }
 
-    // 4. Last resort fallback (should rarely reach here)
+    // 4. Last resort fallback (Standalone APK missing env file)
+    if (!__DEV__) {
+        console.warn("[API] ⚠️ EXPO_PUBLIC_API_URL not found in production build. Falling back to default Render URL.");
+        return `https://dishasetu-backend.onrender.com/api`;
+    }
     return `http://localhost:${BACKEND_PORT}/api`;
-
-    // For mobile (Android/iOS) - use your computer's IP
-    // Find your IP by running: ipconfig (Windows) or ifconfig (Mac/Linux)
-    return 'http://10.198.122.140:3000/api';
-
 };
 
 export const BASE_URL = getBaseUrl();
