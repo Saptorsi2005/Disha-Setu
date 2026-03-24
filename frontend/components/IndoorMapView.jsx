@@ -21,23 +21,23 @@ import {
 
 // ── Palette ────────────────────────────────────────────────────────────────
 const C = {
-  floor:      '#F1F5F9',
-  wall:       '#334155',
-  wallThin:   '#94A3B8',
-  corridor:   '#E2E8F0',
-  shaft:      '#E2E8F0',
-  shaftBorder:'#94A3B8',
-  start:      '#F59E0B',
-  end:        '#7C3AED',
-  route:      '#7C3AED',
-  user:       '#22C55E',
-  label:      '#1E293B',
+  floor: '#F1F5F9',
+  wall: '#334155',
+  wallThin: '#94A3B8',
+  corridor: '#E2E8F0',
+  shaft: '#E2E8F0',
+  shaftBorder: '#94A3B8',
+  start: '#F59E0B',
+  end: '#7C3AED',
+  route: '#7C3AED',
+  user: '#22C55E',
+  label: '#1E293B',
   labelMuted: '#64748B',
-  elevator:   '#0EA5E9',
+  elevator: '#0EA5E9',
   elevatorDk: '#0369A1',
-  stairs:     '#F97316',
-  stairsDk:   '#C2410C',
-  entrance:   '#92400E',
+  stairs: '#F97316',
+  stairsDk: '#C2410C',
+  entrance: '#92400E',
 };
 
 // ── Floor background + corridors ───────────────────────────────────────────
@@ -133,8 +133,8 @@ function ShaftColumn({ highlightElevator = false, highlightStairs = false }) {
       {/* Stair step lines */}
       {[0, 1, 2, 3].map(s => (
         <Line key={s}
-          x1={stair.x + 8}              y1={stair.y + 14 + s * 8}
-          x2={stair.x + stair.w - 8}    y2={stair.y + 14 + s * 8}
+          x1={stair.x + 8} y1={stair.y + 14 + s * 8}
+          x2={stair.x + stair.w - 8} y2={stair.y + 14 + s * 8}
           stroke={C.stairsDk} strokeWidth={1.2} opacity={0.7}
         />
       ))}
@@ -211,18 +211,18 @@ function RoomBlock({ item, isStart, isEnd, isOnRoute, isFloorTransit }) {
   const { x, y, w, h, zone, label } = item;
   const style = ZONE_STYLES[zone] ?? ZONE_STYLES.LEFT;
 
-  let fill   = style.fill;
+  let fill = style.fill;
   let stroke = style.stroke;
-  let sw     = 1.5;
+  let sw = 1.5;
 
-  if (isEnd)          { fill = '#EDE9FE'; stroke = C.end;   sw = 3; }
-  else if (isStart)   { fill = '#FEF3C7'; stroke = C.start; sw = 3; }
+  if (isEnd) { fill = '#EDE9FE'; stroke = C.end; sw = 3; }
+  else if (isStart) { fill = '#FEF3C7'; stroke = C.start; sw = 3; }
   else if (isOnRoute) { fill = '#E0E7FF'; stroke = '#818CF8'; sw = 2; }
   else if (isFloorTransit) { fill = '#DBEAFE'; stroke = C.elevator; sw = 2.5; }
 
-  const words  = (label || '').split(' ');
-  const line1  = words[0] ?? '';
-  const line2  = words.slice(1).join(' ');
+  const words = (label || '').split(' ');
+  const line1 = words[0] ?? '';
+  const line2 = words.slice(1).join(' ');
 
   return (
     <G>
@@ -273,7 +273,7 @@ function RoutePolyline({ routePts, currentIndex }) {
   const safeIdx = Math.min(Math.max(currentIndex, 0), routePts.length - 1);
 
   // Completed segment: start → current position
-  const donePts  = routePts.slice(0, safeIdx + 1);
+  const donePts = routePts.slice(0, safeIdx + 1);
   // Remaining segment: current → end
   const aheadPts = routePts.slice(safeIdx);
 
@@ -310,7 +310,7 @@ function RoutePolyline({ routePts, currentIndex }) {
 // Rotates to face the direction of travel toward the next waypoint.
 function NavArrow({ routePts, currentIndex }) {
   if (!routePts || routePts.length === 0) return null;
-  const safeIdx  = Math.min(Math.max(currentIndex, 0), routePts.length - 1);
+  const safeIdx = Math.min(Math.max(currentIndex, 0), routePts.length - 1);
   const [cx, cy] = routePts[safeIdx];
 
   // Calculate bearing to next point
@@ -324,10 +324,10 @@ function NavArrow({ routePts, currentIndex }) {
 
   // Arrow polygon (equilateral triangle pointing right at 0°)
   // We apply rotation via transform around its own centre
-  const R  = 13;  // half-size
+  const R = 13;  // half-size
   const tip = `${cx + R},${cy}`;
-  const bl  = `${cx - R * 0.6},${cy - R * 0.7}`;
-  const br  = `${cx - R * 0.6},${cy + R * 0.7}`;
+  const bl = `${cx - R * 0.6},${cy - R * 0.7}`;
+  const br = `${cx - R * 0.6},${cy + R * 0.7}`;
   const pts = `${tip} ${bl} ${br}`;
 
   return (
@@ -383,12 +383,12 @@ function FloorSelector({ floorList, active, onChange }) {
 function MapLegend() {
   const items = [
     { color: '#3B82F6', label: '▲ You' },
-    { color: C.start,   label: 'Start' },
-    { color: C.end,     label: 'End' },
+    { color: C.start, label: 'Start' },
+    { color: C.end, label: 'End' },
     { color: '#818CF8', label: 'On Route' },
     { color: '#9CA3AF', label: 'Done' },
-    { color: C.elevator,label: 'Lift' },
-    { color: C.stairs,  label: 'Stairs' },
+    { color: C.elevator, label: 'Lift' },
+    { color: C.stairs, label: 'Stairs' },
     { color: '#C084FC', label: 'Special' },
   ];
   return (
@@ -425,7 +425,7 @@ export default function IndoorMapView({
   const [activeFloor, setActiveFloor] = useState(currentFloor ?? floorList[0]);
 
   // Floor-switch animation
-  const fadeAnim  = useRef(new Animated.Value(1)).current;
+  const fadeAnim = useRef(new Animated.Value(1)).current;
   const [transitioning, setTransitioning] = useState(false);
 
   const floorRooms = useMemo(
@@ -434,8 +434,8 @@ export default function IndoorMapView({
   );
 
   const layoutMap = useMemo(() => computeLayout2D(floorRooms), [floorRooms]);
-  const routePts  = useMemo(() => buildPath2D(layoutMap, routeRoomIds), [layoutMap, routeRoomIds]);
-  const routeSet  = useMemo(() => new Set(routeRoomIds), [routeRoomIds]);
+  const routePts = useMemo(() => buildPath2D(layoutMap, routeRoomIds), [layoutMap, routeRoomIds]);
+  const routeSet = useMemo(() => new Set(routeRoomIds), [routeRoomIds]);
 
   const currentIndex = useMemo(() => {
     if (!userRoomId) return 0;
@@ -464,7 +464,7 @@ export default function IndoorMapView({
     setTransitioning(true);
     Animated.sequence([
       Animated.timing(fadeAnim, { toValue: 0.2, duration: 200, useNativeDriver: true, easing: Easing.out(Easing.ease) }),
-      Animated.timing(fadeAnim, { toValue: 1,   duration: 300, useNativeDriver: true, easing: Easing.in(Easing.ease) }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true, easing: Easing.in(Easing.ease) }),
     ]).start(() => setTransitioning(false));
     setActiveFloor(f);
     onFloorChange?.(f);

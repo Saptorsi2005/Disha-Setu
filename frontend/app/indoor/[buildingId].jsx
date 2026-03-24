@@ -685,7 +685,7 @@ export default function IndoorNavigationScreen() {
                     >
 
                         <Ionicons name="sparkles-outline" size={14} color={activeTab === 'smart' ? '#0A0F1E' : '#9CA3AF'} />
-                        <Text className={`font-bold text-xs ${activeTab === 'smart' ? 'text-[#0A0F1E]' : 'text-txtMuted'}`}>Smart</Text>
+                        <Text className={`font-bold text-xs ${activeTab === 'smart' ? 'text-[#0A0F1E]' : 'text-txtMuted'}`}>Smart Assist</Text>
 
                     </TouchableOpacity >
                 </View >
