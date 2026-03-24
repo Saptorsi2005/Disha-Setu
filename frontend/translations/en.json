@@ -16,7 +16,8 @@
         "loading_projects": "Loading projects...",
         "no_projects": "No projects found",
         "no_results": "No results found",
-        "try_again": "Try changing your location or check your connection."
+        "try_again": "Try changing your location or check your connection.",
+        "done": "Done"
     },
     "auth": {
         "login": "Login",
@@ -67,8 +68,80 @@
         "list": "List",
         "projects_found": "{{count}} projects found near {{label}}",
         "use_gps": "Use GPS",
-        "sim_active": "Location simulation active for testing."
+        "sim_active": "Location simulation active for testing.",
+        "hero": {
+            "title": "Empowering Citizens",
+            "subtitle": "Your bridge to transparent governance",
+            "services": {
+                "tracking": {
+                    "title": "Live Tracking",
+                    "desc": "Real-time oversight of public development works near you.",
+                    "details": {
+                        "about": "Live tracking allows you to monitor the progress of public infrastructure projects in real-time. By leveraging geofencing and IoT data, we bring you the latest on what's happening on the ground.",
+                        "steps": [
+                            { "title": "Find Projects", "desc": "Browse the map or list to find projects in your neighborhood." },
+                            { "title": "Monitor Updates", "desc": "See real-time progress percentages, latest photos, and timeline updates." },
+                            { "title": "Stay Informed", "desc": "Receive notifications when a project near you reaches a major milestone." }
+                        ],
+                        "benefits": [
+                            { "title": "Transparency", "desc": "Hold authorities accountable through visible, trackable progress." },
+                            { "title": "Safety", "desc": "Know about road closures or construction hazards before you head out." }
+                        ]
+                    }
+                },
+                "navigation": {
+                    "title": "Indoor Nav",
+                    "desc": "Smart assistance for navigating complex public buildings.",
+                    "details": {
+                        "about": "Indoor navigation solves the complexity of large public buildings like hospitals, municipal offices, and transit hubs. Get turn-by-step guidance right to the room or counter you need.",
+                        "steps": [
+                            { "title": "Select Destination", "desc": "Search for specific rooms, departments, or amenities within the building." },
+                            { "title": "Follow Guidance", "desc": "Follow precise, step-by-step visual and haptic cues on your phone." },
+                            { "title": "Smart Paths", "desc": "Use Smart Assist to generate the most efficient route based on your specific needs." }
+                        ],
+                        "benefits": [
+                            { "title": "Time Saving", "desc": "Never get lost again in sprawling corridors or complex floor plans." },
+                            { "title": "Accessibility", "desc": "Routes optimized for elevators, ramps, and accessible entrances." }
+                        ]
+                    }
+                },
+                "feedback": {
+                    "title": "Civic Feedback",
+                    "desc": "Report issues directly with AI-powered verification.",
+                    "details": {
+                        "about": "Civic feedback is your voice in the community. Report issues like potholes, broken lights, or construction delays, and track them until they are resolved.",
+                        "steps": [
+                            { "title": "Spot an Issue", "desc": "Take a photo of the problem and describe what needs attention." },
+                            { "title": "AI Verification", "desc": "Our AI checks the photo for authenticity to ensure fast and valid reporting." },
+                            { "title": "Track Resolution", "desc": "Follow your report's status from 'Pending' to 'Resolved' in real-time." }
+                        ],
+                        "benefits": [
+                            { "title": "Verified Reports", "desc": "AI ensures only genuine issues are reported, speeding up government action." },
+                            { "title": "Impact Points", "desc": "Earn civic points for every successfully resolved issue you report." }
+                        ]
+                    }
+                },
+                "impact": {
+                    "title": "Your Impact",
+                    "desc": "Earn badges and points for your community contributions.",
+                    "details": {
+                        "about": "Your Impact celebrates your commitment to the community. Every action you take—from reporting an issue to checking on a project—contributes to a better city.",
+                        "steps": [
+                            { "title": "Contribute Daily", "desc": "Engage with projects, provide feedback, and verify completed works." },
+                            { "title": "Earn Points", "desc": "Accumulate civic points for every positive action you take in the app." },
+                            { "title": "Level Up", "desc": "Unlock exclusive badges and titles as you transition from a 'Newcomer' to a 'City Guardian'." }
+                        ],
+                        "benefits": [
+                            { "title": "Recognition", "desc": "Be recognized as a leading voice in your local community." },
+                            { "title": "Community Growth", "desc": "See how your individual contributions add up to collective change." }
+                        ]
+                    }
+                }
+
+            }
+        }
     },
+
     "search": {
         "placeholder": "Search projects, locations...",
         "results": "{{count}} result{{s}}",
@@ -112,7 +185,15 @@
         "get_directions": "Get Directions",
         "report_issue": "Report Issue",
         "give_feedback": "Give Feedback",
-        "not_found": "Project not found"
+        "not_found": "Project not found",
+        "news_title": "Project News & Civic Insights",
+        "no_news": "No live news articles found for this project recently.",
+        "source_articles": "Source Articles",
+        "read_full": "Read Full Article",
+        "public_reviews": "Public Reviews",
+        "no_reviews": "No reviews yet for this project",
+        "by_user": "By {{name}}",
+        "away": "away"
     },
     "help": {
         "title": "Help Center",
@@ -214,5 +295,122 @@
                 ]
             }
         ]
+    },
+    "feedback": {
+        "title": "Report an Issue",
+        "submitted_title": "Report Submitted",
+        "thank_you": "Thank You!",
+        "success_msg": "Your report has been submitted successfully. We'll track this and notify you of updates.",
+        "ticket_id": "Ticket ID",
+        "save_id": "Save this ID to track your report",
+        "back_to_project": "Back to Project",
+        "submit_another": "Submit another report",
+        "reporting_for": "Reporting for",
+        "issue_type": "Issue Type",
+        "description": "Description",
+        "placeholder_desc": "Describe the issue clearly...",
+        "photo_optional": "Photo (optional)",
+        "tap_attach": "Tap to attach a photo",
+        "tap_change": "Tap to change photo",
+        "ai_checking": "Analyzing image authenticity...",
+        "ai_real": "Real image verified",
+        "ai_detected": "AI-generated image detected. Please upload a real photo.",
+        "submit_btn": "Submit Report",
+        "categories": {
+            "delay": "Delay",
+            "safety": "Safety",
+            "noise": "Noise",
+            "traffic": "Traffic",
+            "corruption": "Corruption",
+            "other": "Other"
+        },
+        "status_pending": "Pending",
+        "status_reviewed": "Reviewed",
+        "status_resolved": "Resolved",
+        "status_rejected": "Rejected",
+        "issue": "issue"
+    },
+    "indoor": {
+        "loading": "Loading building...",
+        "not_found": "Building Not Found",
+        "go_back": "Go Back",
+        "navigation_tab": "Indoor Navigation",
+        "smart_assist_tab": "Smart Assist",
+        "select_floor": "Select Floor",
+        "directions": "Directions",
+        "turn_by_turn": "Turn-by-Turn",
+        "total_distance": "Total Distance",
+        "start_nav": "Start Navigation",
+        "stop_nav": "Stop",
+        "next_step": "Next Step",
+        "arrived": "Arrived!",
+        "search_placeholder": "Search rooms, departments...",
+        "from": "From: {{name}}",
+        "to": "To: {{name}}",
+        "route_found": "Route Found",
+        "no_route": "No Route Found",
+        "select_start": "Select Start",
+        "select_dest": "Select Destination",
+        "reset": "Reset",
+        "room": "Room {{number}}",
+        "floor": "Floor {{number}}",
+        "describe_needs": "Describe your needs",
+        "generate_route": "Generate My Route",
+        "analyzing": "Analyzing Document...",
+        "detected_needs": "Detected Needs",
+        "visit_order": "Your Visit Order",
+        "auto_route": "Auto-Generated Route",
+        "route_ready": "Route Ready!",
+        "another_route": "Generate Another Route",
+        "demo_tag": "Demo Indoor Navigation"
+    },
+    "profile": {
+        "title": "Profile",
+        "guest": "Guest User",
+        "default_user": "DishaSetu User",
+        "loading": "Loading profile...",
+        "role_user": "user",
+        "role_admin": "admin",
+        "earn_badges": "File reports to earn badges!",
+        "submit_feedback": "Submit Feedback",
+        "my_activity": "My Activity",
+        "settings": "Settings",
+        "back": "Back",
+        "edit_name": "Enter name",
+        "civic_points": "civic points",
+        "since": "Since {{date}}",
+        "google": "Google",
+        "achievements": "ACHIEVEMENTS",
+        "civic_impact": "CIVIC IMPACT",
+        "recent_reports": "RECENT REPORTS",
+        "view_all": "View all",
+        "no_reports": "No reports yet",
+        "no_reports_msg": "Report a civic issue and make your voice heard.",
+        "file_report": "File a Report",
+        "quick_actions": "QUICK ACTIONS",
+        "resolution_rate": "Resolution rate",
+        "issue_resolved": "{{count}} issue resolved",
+        "issues_resolved": "{{count}} issues resolved",
+        "impact_start": "Start making an impact",
+        "impact_desc": "Your reports drive real civic change.",
+        "impact_start_desc": "File your first report to begin.",
+        "last_updated": "Last updated {{time}}",
+        "reports_tab": "Reports",
+        "resolved_tab": "Resolved",
+        "points_tab": "Points",
+        "badges": {
+            "first_report": "First Reporter",
+            "verified": "Verified Citizen",
+            "active": "Active Citizen",
+            "top_contributor": "Top Contributor",
+            "voice": "Community Voice"
+        },
+        "levels": {
+            "newcomer": "Civic Newcomer",
+            "reporter": "Active Reporter",
+            "leader": "Community Leader",
+            "champion": "Civic Champion",
+            "guardian": "City Guardian"
+        }
     }
 }

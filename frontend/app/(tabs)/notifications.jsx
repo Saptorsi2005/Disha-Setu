@@ -23,7 +23,7 @@ const NOTIFICATION_ICONS = {
 function NotifCard({ notif, isLast, onPress }) {
     const meta = NOTIFICATION_ICONS[notif.type] || { icon: 'notifications-outline', color: '#9CA3AF' };
     return (
-        <TouchableOpacity 
+        <TouchableOpacity
             onPress={onPress}
             activeOpacity={0.7}
             className={`flex-row items-start px-4 py-3.5 ${!isLast ? 'border-b border-cardBorder' : ''}`}
@@ -136,7 +136,7 @@ export default function NotificationsScreen() {
 
             {/* Geo Alert — slim banner */}
             {geoAlert && (
-                <TouchableOpacity 
+                <TouchableOpacity
                     onPress={() => {
                         if (geoAlert.projectId) {
                             router.push(`/project/${geoAlert.projectId}`);
@@ -178,10 +178,10 @@ export default function NotificationsScreen() {
                     ) : (
                         <View className="bg-card rounded-xl border border-cardBorder overflow-hidden">
                             {notifications.map((n, idx) => (
-                                <NotifCard 
-                                    key={n.id} 
-                                    notif={n} 
-                                    isLast={idx === notifications.length - 1} 
+                                <NotifCard
+                                    key={n.id}
+                                    notif={n}
+                                    isLast={idx === notifications.length - 1}
                                     onPress={() => {
                                         handleMarkRead(n.id);
                                         if (n.projectId) {

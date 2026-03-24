@@ -14,6 +14,7 @@ import { fetchMe } from '../services/authService';
 import { fetchUserFeedback } from '../services/feedbackService';
 import { apiFetch, BASE_URL } from '../services/api';
 import { formatDate, formatRelativeTime } from '../utils/dateFormatter';
+import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ── Constants ─────────────────────────────────────────────────────
@@ -29,20 +30,20 @@ const STATUS_COLORS = {
     rejected: { bg: '#EF444418', text: '#EF4444', border: '#EF444430' },
 };
 
-const CIVIC_LEVEL_COLORS = {
-    'Civic Newcomer': { color: '#6B7280', icon: 'person-outline' },
-    'Active Reporter': { color: '#6366F1', icon: 'megaphone-outline' },
-    'Community Leader': { color: '#F59E0B', icon: 'ribbon-outline' },
-    'Civic Champion': { color: '#10B981', icon: 'trophy-outline' },
-    'City Guardian': { color: '#00D4AA', icon: 'shield-checkmark-outline' },
+const CIVIC_LEVEL_KEYS = {
+    'Civic Newcomer': { color: '#6B7280', icon: 'person-outline', key: 'newcomer' },
+    'Active Reporter': { color: '#6366F1', icon: 'megaphone-outline', key: 'reporter' },
+    'Community Leader': { color: '#F59E0B', icon: 'ribbon-outline', key: 'leader' },
+    'Civic Champion': { color: '#10B981', icon: 'trophy-outline', key: 'champion' },
+    'City Guardian': { color: '#00D4AA', icon: 'shield-checkmark-outline', key: 'guardian' },
 };
 
 const BADGES = [
-    { id: 'first_report', label: 'First Reporter', icon: 'flag-outline', color: '#00D4AA', condition: (r) => r.length >= 1 },
-    { id: 'verified', label: 'Verified Citizen', icon: 'shield-checkmark-outline', color: '#6366F1', condition: (r) => r.length >= 1 },
-    { id: 'active', label: 'Active Citizen', icon: 'people-outline', color: '#F59E0B', condition: (r) => r.length >= 3 },
-    { id: 'top_contributor', label: 'Top Contributor', icon: 'ribbon-outline', color: '#10B981', condition: (r, res) => res >= 5 },
-    { id: 'voice', label: 'Community Voice', icon: 'megaphone-outline', color: '#F97316', condition: (r) => r.length >= 10 },
+    { id: 'first_report', icon: 'flag-outline', color: '#00D4AA', condition: (r) => r.length >= 1, key: 'badge_first_report' },
+    { id: 'verified', icon: 'shield-checkmark-outline', color: '#6366F1', condition: (r) => r.length >= 1, key: 'badge_verified' },
+    { id: 'active', icon: 'people-outline', color: '#F59E0B', condition: (r) => r.length >= 3, key: 'badge_active' },
+    { id: 'top_contributor', icon: 'ribbon-outline', color: '#10B981', condition: (r, res) => res >= 5, key: 'badge_top_contributor' },
+    { id: 'voice', icon: 'megaphone-outline', color: '#F97316', condition: (r) => r.length >= 10, key: 'badge_voice' },
 ];
 
 // ── Sub-components ────────────────────────────────────────────────
@@ -59,6 +60,7 @@ function StatPill({ icon, label, value, color }) {
 }
 
 function BadgeCard({ badge, earned }) {
+    const { t } = useTranslation();
     return (
         <View className="items-center mr-4 w-20" style={{ opacity: earned ? 1 : 0.3 }}>
             <View
@@ -67,12 +69,13 @@ function BadgeCard({ badge, earned }) {
             >
                 <Ionicons name={badge.icon} size={24} color={earned ? badge.color : '#6B7280'} />
             </View>
-            <Text className="text-txt text-[10px] font-semibold text-center leading-4">{badge.label}</Text>
+            <Text className="text-txt text-[10px] font-semibold text-center leading-4">{t(`profile.${badge.key}`)}</Text>
         </View>
     );
 }
 
 function ReportCard({ report, isLast }) {
+    const { t } = useTranslation();
     const color = CATEGORY_COLORS[report.category] || '#6366F1';
     const s = STATUS_COLORS[(report.status || 'pending').toLowerCase()] || STATUS_COLORS['pending'];
     return (
@@ -82,9 +85,13 @@ function ReportCard({ report, isLast }) {
             </View>
             <View className="flex-1">
                 <View className="flex-row items-center justify-between mb-0.5">
-                    <Text className="text-txt font-semibold text-sm capitalize flex-1 mr-2" numberOfLines={1}>{report.category} issue</Text>
+                    <Text className="text-txt font-semibold text-sm capitalize flex-1 mr-2" numberOfLines={1}>
+                        {t(`feedback.categories.${report.category}`)} {t('feedback.issue')}
+                    </Text>
                     <View className="px-2 py-0.5 rounded-md border" style={{ backgroundColor: s.bg, borderColor: s.border }}>
-                        <Text className="text-[10px] font-bold capitalize" style={{ color: s.text }}>{report.status}</Text>
+                        <Text className="text-[10px] font-bold capitalize" style={{ color: s.text }}>
+                            {t(`feedback.status_${(report.status || 'pending').toLowerCase()}`)}
+                        </Text>
                     </View>
                 </View>
                 <Text className="text-txtMuted text-xs leading-4" numberOfLines={2}>{report.description}</Text>
@@ -96,6 +103,7 @@ function ReportCard({ report, isLast }) {
 
 // ── Main Screen ───────────────────────────────────────────────────
 export default function ProfileScreen() {
+    const { t } = useTranslation();
     const router = useRouter();
     const { isDark } = useColorScheme();
     const { user, login } = useAuth();
@@ -133,7 +141,7 @@ export default function ProfileScreen() {
     const handlePickAvatar = async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
-            Alert.alert('Permission Denied', 'Please allow access to your photo library in settings.');
+            Alert.alert(t('common.error'), t('profile.permission_denied') || 'Please allow access to your photo library in settings.');
             return;
         }
         const result = await ImagePicker.launchImageLibraryAsync({
@@ -164,7 +172,7 @@ export default function ProfileScreen() {
             setProfile(prev => ({ ...prev, avatar_url: data.avatar_url }));
             login({ ...user, avatar_url: data.avatar_url });
         } catch (err) {
-            Alert.alert('Upload Failed', err.message);
+            Alert.alert(t('common.error'), err.message);
         } finally {
             setAvatarUploading(false);
         }
@@ -185,7 +193,7 @@ export default function ProfileScreen() {
             login({ ...user, name: updated.name });
             setIsEditingName(false);
         } catch (err) {
-            Alert.alert('Error', err.message || 'Failed to update name');
+            Alert.alert(t('common.error'), err.message || 'Failed to update name');
         } finally {
             setSaving(false);
         }
@@ -195,13 +203,13 @@ export default function ProfileScreen() {
         return (
             <SafeAreaView className="flex-1 bg-main items-center justify-center">
                 <ActivityIndicator size="large" color="#00D4AA" />
-                <Text className="text-txtMuted mt-3 text-sm">Loading profile…</Text>
+                <Text className="text-txtMuted mt-3 text-sm">{t('profile.loading')}</Text>
             </SafeAreaView>
         );
     }
 
     // ── Derived values ────────────────────────────────────────────
-    const displayName = profile?.name || (profile?.is_guest ? 'Guest User' : 'DishaSetu User');
+    const displayName = profile?.name || (profile?.is_guest ? t('profile.guest') : t('profile.default_user'));
     const displayPhone = profile?.phone ? `+91 ${profile.phone}` : null;
     const avatarUrl = profile?.avatar_url;
     const civicLevel = profile?.civic_level || 'Civic Newcomer';
@@ -212,7 +220,7 @@ export default function ProfileScreen() {
     const resolvedCount = reports.filter(r => r.status === 'resolved').length;
     const pendingCount = reports.filter(r => r.status === 'pending').length;
 
-    const lvlMeta = CIVIC_LEVEL_COLORS[civicLevel] || CIVIC_LEVEL_COLORS['Civic Newcomer'];
+    const lvlMeta = CIVIC_LEVEL_KEYS[civicLevel] || CIVIC_LEVEL_KEYS['Civic Newcomer'];
     const earnedBadges = BADGES.filter(b => b.condition(reports, resolvedCount));
 
     return (
@@ -221,9 +229,9 @@ export default function ProfileScreen() {
             <View className="px-5 pt-4 pb-3 flex-row items-center justify-between border-b border-cardBorder">
                 <TouchableOpacity onPress={() => router.back()} className="flex-row items-center gap-1.5">
                     <Ionicons name="arrow-back" size={20} color={iconDim} />
-                    <Text className="text-txtMuted text-sm font-medium">Back</Text>
+                    <Text className="text-txtMuted text-sm font-medium">{t('common.back')}</Text>
                 </TouchableOpacity>
-                <Text className="text-txt text-base font-bold">Profile</Text>
+                <Text className="text-txt text-base font-bold">{t('profile.title')}</Text>
                 <View className="w-10" /> 
             </View>
 
@@ -269,7 +277,7 @@ export default function ProfileScreen() {
                                     value={editName}
                                     onChangeText={setEditName}
                                     autoFocus
-                                    placeholder="Enter name"
+                                    placeholder={t('profile.edit_name')}
                                     placeholderTextColor="#6B7280"
                                 />
                                 <TouchableOpacity 
@@ -311,14 +319,14 @@ export default function ProfileScreen() {
                             style={{ backgroundColor: `${lvlMeta.color}18`, borderColor: `${lvlMeta.color}40` }}
                         >
                             <Ionicons name={lvlMeta.icon} size={13} color={lvlMeta.color} />
-                            <Text className="text-xs font-bold" style={{ color: lvlMeta.color }}>{civicLevel}</Text>
+                            <Text className="text-xs font-bold" style={{ color: lvlMeta.color }}>{t(`profile.levels.${lvlMeta.key}`)}</Text>
                         </View>
 
                         {/* Civic Points */}
                         <View className="flex-row items-center gap-1.5 mt-2">
                             <Ionicons name="star" size={13} color="#F59E0B" />
                             <Text className="text-txtMuted text-xs font-semibold">
-                                <Text className="text-txt font-bold">{civicPoints}</Text> civic points
+                                <Text className="text-txt font-bold">{civicPoints}</Text> {t('profile.civic_points')}
                             </Text>
                         </View>
 
@@ -326,14 +334,14 @@ export default function ProfileScreen() {
                         <View className="flex-row items-center gap-3 mt-4 pt-4 border-t border-cardBorder w-full justify-center">
                             <View className="flex-row items-center gap-1">
                                 <Ionicons name={profile?.role === 'admin' ? 'shield-checkmark' : 'person-circle-outline'} size={13} color={iconDim} />
-                                <Text className="text-txtMuted text-xs capitalize">{profile?.role || 'user'}</Text>
+                                <Text className="text-txtMuted text-xs capitalize">{t(`profile.role_${profile?.role || 'user'}`)}</Text>
                             </View>
                             {memberSince && (
                                 <>
                                     <View className="w-0.5 h-3 bg-cardBorder" />
                                     <View className="flex-row items-center gap-1">
                                         <Ionicons name="calendar-outline" size={13} color={iconDim} />
-                                        <Text className="text-txtMuted text-xs">Since {memberSince}</Text>
+                                        <Text className="text-txtMuted text-xs">{t('profile.since', { date: memberSince })}</Text>
                                     </View>
                                 </>
                             )}
@@ -342,7 +350,7 @@ export default function ProfileScreen() {
                                     <View className="w-0.5 h-3 bg-cardBorder" />
                                     <View className="flex-row items-center gap-1">
                                         <Text style={{ fontSize: 12, color: '#EA4335', fontWeight: '700' }}>G</Text>
-                                        <Text className="text-txtMuted text-xs">Google</Text>
+                                        <Text className="text-txtMuted text-xs">{t('profile.google')}</Text>
                                     </View>
                                 </>
                             )}
@@ -352,14 +360,14 @@ export default function ProfileScreen() {
 
                 {/* Stats Row */}
                 <View className="flex-row gap-3 mx-5 mt-4">
-                    <StatPill icon="chatbubbles-outline" label="Reports" value={reports.length} color="#6366F1" />
-                    <StatPill icon="checkmark-circle-outline" label="Resolved" value={resolvedCount} color="#10B981" />
-                    <StatPill icon="star-outline" label="Points" value={civicPoints} color="#F59E0B" />
+                    <StatPill icon="chatbubbles-outline" label={t('profile.reports_tab')} value={reports.length} color="#6366F1" />
+                    <StatPill icon="checkmark-circle-outline" label={t('profile.resolved_tab')} value={resolvedCount} color="#10B981" />
+                    <StatPill icon="star-outline" label={t('profile.points_tab')} value={civicPoints} color="#F59E0B" />
                 </View>
 
                 {/* Achievements / Badges */}
                 <View className="mx-5 mt-5">
-                    <Text className="text-txtMuted text-xs font-semibold mb-3">ACHIEVEMENTS</Text>
+                    <Text className="text-txtMuted text-xs font-semibold mb-3">{t('profile.achievements')}</Text>
                     <View className="bg-card rounded-2xl border border-cardBorder px-5 py-4">
                         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                             <View className="flex-row">
@@ -373,14 +381,14 @@ export default function ProfileScreen() {
                             </View>
                         </ScrollView>
                         {earnedBadges.length === 0 && (
-                            <Text className="text-txtMuted text-xs text-center mt-2">File reports to earn badges!</Text>
+                            <Text className="text-txtMuted text-xs text-center mt-2">{t('profile.earn_badges')}</Text>
                         )}
                     </View>
                 </View>
 
                 {/* Civic Impact */}
                 <View className="mx-5 mt-5">
-                    <Text className="text-txtMuted text-xs font-semibold mb-3">CIVIC IMPACT</Text>
+                    <Text className="text-txtMuted text-xs font-semibold mb-3">{t('profile.civic_impact')}</Text>
                     <View className="bg-card rounded-2xl border border-cardBorder p-4">
                         <View className="flex-row items-center gap-3 mb-3">
                             <View className="w-10 h-10 rounded-xl bg-[#00D4AA]/10 items-center justify-center">
@@ -389,18 +397,18 @@ export default function ProfileScreen() {
                             <View className="flex-1">
                                 <Text className="text-txt font-bold text-sm">
                                     {resolvedCount > 0
-                                        ? `${resolvedCount} issue${resolvedCount > 1 ? 's' : ''} resolved`
-                                        : 'Start making an impact'}
+                                        ? t('profile.issues_resolved', { count: resolvedCount })
+                                        : t('profile.impact_start')}
                                 </Text>
                                 <Text className="text-txtMuted text-xs mt-0.5">
-                                    {resolvedCount > 0 ? 'Your reports drive real civic change.' : 'File your first report to begin.'}
+                                    {resolvedCount > 0 ? t('profile.impact_desc') : t('profile.impact_start_desc')}
                                 </Text>
                             </View>
                         </View>
                         {reports.length > 0 && (
                             <>
                                 <View className="flex-row justify-between mb-1.5">
-                                    <Text className="text-txtMuted text-xs">Resolution rate</Text>
+                                    <Text className="text-txtMuted text-xs">{t('profile.resolution_rate')}</Text>
                                     <Text className="text-[#00D4AA] text-xs font-bold">
                                         {Math.round((resolvedCount / reports.length) * 100)}%
                                     </Text>
@@ -419,23 +427,23 @@ export default function ProfileScreen() {
                 {/* Recent Reports */}
                 <View className="mx-5 mt-5">
                     <View className="flex-row items-center justify-between mb-3">
-                        <Text className="text-txtMuted text-xs font-semibold">RECENT REPORTS</Text>
+                        <Text className="text-txtMuted text-xs font-semibold">{t('profile.recent_reports')}</Text>
                         {reports.length > 4 && (
                             <TouchableOpacity onPress={() => router.push('/(tabs)/activity')}>
-                                <Text className="text-[#00D4AA] text-xs font-semibold">View all</Text>
+                                <Text className="text-[#00D4AA] text-xs font-semibold">{t('profile.view_all')}</Text>
                             </TouchableOpacity>
                         )}
                     </View>
                     {reports.length === 0 ? (
                         <View className="bg-card rounded-2xl border border-cardBorder py-10 items-center">
                             <Ionicons name="document-text-outline" size={36} color={iconDim} />
-                            <Text className="text-txt font-bold text-sm mt-3">No reports yet</Text>
-                            <Text className="text-txtMuted text-xs mt-1">Report a civic issue and make your voice heard.</Text>
+                            <Text className="text-txt font-bold text-sm mt-3">{t('profile.no_reports')}</Text>
+                            <Text className="text-txtMuted text-xs mt-1">{t('profile.no_reports_msg')}</Text>
                             <TouchableOpacity
                                 className="mt-4 px-5 py-2.5 rounded-xl bg-[#00D4AA]/10 border border-[#00D4AA]/30"
                                 onPress={() => router.push('/feedback')}
                             >
-                                <Text className="text-[#00D4AA] text-sm font-semibold">File a Report</Text>
+                                <Text className="text-[#00D4AA] text-sm font-semibold">{t('profile.file_report')}</Text>
                             </TouchableOpacity>
                         </View>
                     ) : (
@@ -449,12 +457,12 @@ export default function ProfileScreen() {
 
                 {/* Quick Actions */}
                 <View className="mx-5 mt-5">
-                    <Text className="text-txtMuted text-xs font-semibold mb-3">QUICK ACTIONS</Text>
+                    <Text className="text-txtMuted text-xs font-semibold mb-3">{t('profile.quick_actions')}</Text>
                     <View className="bg-card rounded-2xl border border-cardBorder overflow-hidden">
                         {[
-                            { icon: 'megaphone-outline', label: 'Submit Feedback', color: '#6366F1', route: '/feedback' },
-                            { icon: 'bar-chart-outline', label: 'My Activity', color: '#F59E0B', route: '/(tabs)/activity' },
-                            { icon: 'settings-outline', label: 'Settings', color: '#00D4AA', route: '/(tabs)/settings' },
+                            { icon: 'megaphone-outline', label: t('profile.submit_feedback'), color: '#6366F1', route: '/feedback' },
+                            { icon: 'bar-chart-outline', label: t('profile.my_activity'), color: '#F59E0B', route: '/(tabs)/activity' },
+                            { icon: 'settings-outline', label: t('profile.settings'), color: '#00D4AA', route: '/(tabs)/settings' },
                         ].map((item, idx, arr) => (
                             <TouchableOpacity
                                 key={item.route}
@@ -475,7 +483,7 @@ export default function ProfileScreen() {
                 {/* Footer meta */}
                 {lastUpdated && (
                     <Text className="text-center text-txtMuted text-[10px] mt-5">
-                        Last updated {lastUpdated}
+                        {t('profile.last_updated', { time: lastUpdated })}
                     </Text>
                 )}
             </ScrollView>

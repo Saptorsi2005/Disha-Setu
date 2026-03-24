@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, LayoutAnimation, UIManager, Platform, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useColorScheme } from '../hooks/use-color-scheme';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -8,6 +9,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 export default function NewsImpactCard({ data }) {
+    const { t } = useTranslation();
     const { isDark } = useColorScheme();
     const [expandedIndexes, setExpandedIndexes] = useState([]);
 
@@ -18,11 +20,11 @@ export default function NewsImpactCard({ data }) {
             <View className="mb-4 mx-4">
                 <View className="flex-row items-center gap-2 mb-3">
                     <Ionicons name="analytics-outline" size={20} color="#8B5CF6" />
-                    <Text className="text-txt font-bold text-base">Project News & Civic Insights</Text>
+                    <Text className="text-txt font-bold text-base">{t('project.news_title')}</Text>
                 </View>
                 <View className="bg-card rounded-2xl border border-cardBorder p-6 items-center justify-center">
                     <Ionicons name="newspaper-outline" size={32} color={isDark ? '#374151' : '#E5E7EB'} />
-                    <Text className="text-txtMuted mt-3 text-sm text-center tracking-wide font-medium">No live news articles found for this project recently.</Text>
+                    <Text className="text-txtMuted mt-3 text-sm text-center tracking-wide font-medium">{t('project.no_news')}</Text>
                 </View>
             </View>
         );
@@ -41,7 +43,7 @@ export default function NewsImpactCard({ data }) {
         <View className="mb-4">
             <View className="flex-row items-center gap-2 mb-3 mx-4">
                 <Ionicons name="analytics-outline" size={20} color="#8B5CF6" />
-                <Text className="text-txt font-bold text-base">Project News & Civic Insights</Text>
+                <Text className="text-txt font-bold text-base">{t('project.news_title')}</Text>
             </View>
 
             {/* Civic Impact Insights Box */}
@@ -80,7 +82,7 @@ export default function NewsImpactCard({ data }) {
 
             {/* Source Articles Accordion */}
             <View className="mx-4">
-                <Text className="text-txt text-sm font-bold mb-2">Source Articles</Text>
+                <Text className="text-txt text-sm font-bold mb-2">{t('project.source_articles')}</Text>
                 {articles.map((article, idx) => {
                     const isExpanded = expandedIndexes.includes(idx);
                     
@@ -123,7 +125,7 @@ export default function NewsImpactCard({ data }) {
                                             onPress={() => Linking.openURL(article.link).catch(() => {})}
                                             className="flex-row items-center self-end bg-[#8B5CF6]/10 px-3 py-1.5 rounded-lg border border-[#8B5CF6]/20"
                                         >
-                                            <Text className="text-[#8B5CF6] font-bold text-xs mr-1">Read Full Article</Text>
+                                            <Text className="text-[#8B5CF6] font-bold text-xs mr-1">{t('project.read_full')}</Text>
                                             <Ionicons name="open-outline" size={14} color="#8B5CF6" />
                                         </TouchableOpacity>
                                     )}

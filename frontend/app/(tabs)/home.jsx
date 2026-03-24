@@ -3,7 +3,9 @@
  */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image, ActivityIndicator, RefreshControl, Alert } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { useRouter, useFocusEffect } from 'expo-router';
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocation } from '../../hooks/use-location';
@@ -15,7 +17,9 @@ import { emitLocation } from '../../services/socketService';
 import { CATEGORY_ICONS } from '../../constants/mockData';
 import { useTranslation } from 'react-i18next';
 import MapView, { Marker } from '../../components/ProjectMap';
+import HeroSection from '../../components/HeroSection';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STATUS_COLOR = {
@@ -192,19 +196,32 @@ export default function HomeScreen() {
                         onPress={() => isDevMode && setShowLocationModal(true)}
                         activeOpacity={isDevMode ? 0.7 : 1}
                     >
-                        <View className={`w-7 h-7 rounded-lg items-center justify-center ${mode === 'gps' ? 'bg-[#00D4AA]/15' : 'bg-[#6366F1]/15'}`}>
-                            <Ionicons name={mode === 'gps' ? 'location' : 'map'} size={15} color={mode === 'gps' ? '#00D4AA' : '#6366F1'} />
-                        </View>
-                        <View className="flex-1">
-                            <Text className="text-txtMuted text-[10px] font-medium mb-0.5">
-                                {isDevMode && mode === 'manual' ? t('home.test_location', 'Test Location') : t('home.current_location', 'Current Location')}
-                            </Text>
-                            <View className="flex-row items-center gap-1">
-                                <Text className="text-txt font-semibold text-sm" numberOfLines={1}>{label}</Text>
-                                {isDevMode && <Ionicons name="chevron-down" size={12} color={iconDim} />}
-                            </View>
-                        </View>
+                        {!isDevMode ? (
+                            <ExpoImage 
+                                source={isDark ? require('../../assets/images/dark_logo.svg') : require('../../assets/images/light_logo.svg')}
+                                style={{ width: 160, height: 44 }}
+                                contentFit="contain"
+                                transition={200}
+                            />
+                        ) : (
+
+                            <>
+                                <View className={`w-7 h-7 rounded-lg items-center justify-center ${mode === 'gps' ? 'bg-[#00D4AA]/15' : 'bg-[#6366F1]/15'}`}>
+                                    <Ionicons name={mode === 'gps' ? 'location' : 'map'} size={15} color={mode === 'gps' ? '#00D4AA' : '#6366F1'} />
+                                </View>
+                                <View className="flex-1">
+                                    <Text className="text-txtMuted text-[10px] font-medium mb-0.5">
+                                        {isDevMode && mode === 'manual' ? t('home.test_location', 'Test Location') : t('home.current_location', 'Current Location')}
+                                    </Text>
+                                    <View className="flex-row items-center gap-1">
+                                        <Text className="text-txt font-semibold text-sm" numberOfLines={1}>{label}</Text>
+                                        {isDevMode && <Ionicons name="chevron-down" size={12} color={iconDim} />}
+                                    </View>
+                                </View>
+                            </>
+                        )}
                     </TouchableOpacity>
+
 
                     {/* View Mode toggle — inline, no floating pill */}
                     <View className="flex-row items-center bg-surface rounded-lg p-0.5 border border-cardBorder mr-3">
@@ -248,28 +265,6 @@ export default function HomeScreen() {
                 </View>
             )}
 
-            {/* Nearest Project Banner */}
-            {nearestProject && (
-                <TouchableOpacity
-                    className="mx-4 mb-3 rounded-xl p-3 border-l-4 border-[#00D4AA] bg-card border border-cardBorder"
-                    style={{ borderLeftWidth: 3, borderLeftColor: '#00D4AA' }}
-                    onPress={() => router.push(`/project/${nearestProject.id}`)}
-                >
-                    <View className="flex-row items-center justify-between">
-                        <View className="flex-1">
-                            <Text className="text-txtMuted text-[10px] font-semibold uppercase mb-0.5">{t('home.nearest_site')}</Text>
-                            <Text className="text-txt font-semibold text-sm" numberOfLines={1}>{nearestProject.name}</Text>
-                            <Text className="text-txtMuted text-xs mt-0.5">{nearestProject.area}</Text>
-                        </View>
-                        <View className="items-end ml-3">
-                            <Text className="text-[#00D4AA] font-bold text-sm">
-                                {nearestProject.distance_m < 1000 ? `${nearestProject.distance_m}m` : `${(nearestProject.distance_m / 1000).toFixed(1)}km`}
-                            </Text>
-                            <Ionicons name="arrow-forward" size={14} color={iconDim} style={{ marginTop: 4 }} />
-                        </View>
-                    </View>
-                </TouchableOpacity>
-            )}
 
             {/* Main Content */}
             <View className="flex-1 bg-card rounded-t-2xl border-t border-cardBorder overflow-hidden">
@@ -344,25 +339,53 @@ export default function HomeScreen() {
                     <ScrollView
                         className="flex-1"
                         showsVerticalScrollIndicator={false}
-                        contentContainerStyle={{ padding: 16, paddingBottom: 90 }}
+                        contentContainerStyle={{ paddingBottom: 90 }}
                         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00D4AA" />}
                     >
-                        {projects.length === 0 ? (
-                            <View className="items-center justify-center py-20">
-                                <Ionicons name="construct-outline" size={44} color={iconDim} />
-                                <Text className="text-txt font-bold text-lg mt-4">{t('common.no_projects')}</Text>
-                                <Text className="text-txtMuted text-sm mt-2 text-center">{t('common.try_again')}</Text>
-                            </View>
-                        ) : (
-                            visibleProjects.map(project => (
-                                <ProjectCard
-                                    key={project.id}
-                                    project={project}
-                                    onPress={() => router.push(`/project/${project.id}`)}
-                                />
-                            ))
+                        {/* Nearest Project Banner */}
+                        {nearestProject && (
+                            <TouchableOpacity
+                                className="mx-4 mb-4 rounded-xl p-3 border-l-4 border-[#00D4AA] bg-card border border-cardBorder"
+                                style={{ borderLeftWidth: 3, borderLeftColor: '#00D4AA' }}
+                                onPress={() => router.push(`/project/${nearestProject.id}`)}
+                            >
+                                <View className="flex-row items-center justify-between">
+                                    <View className="flex-1">
+                                        <Text className="text-txtMuted text-[10px] font-semibold uppercase mb-0.5">{t('home.nearest_site')}</Text>
+                                        <Text className="text-txt font-semibold text-sm" numberOfLines={1}>{nearestProject.name}</Text>
+                                        <Text className="text-txtMuted text-xs mt-0.5">{nearestProject.area}</Text>
+                                    </View>
+                                    <View className="items-end ml-3">
+                                        <Text className="text-[#00D4AA] font-bold text-sm">
+                                            {nearestProject.distance_m < 1000 ? `${nearestProject.distance_m}m` : `${(nearestProject.distance_m / 1000).toFixed(1)}km`}
+                                        </Text>
+                                        <Ionicons name="arrow-forward" size={14} color={iconDim} style={{ marginTop: 4 }} />
+                                    </View>
+                                </View>
+                            </TouchableOpacity>
                         )}
+
+                        <HeroSection />
+
+                        <View className="px-4">
+                            {projects.length === 0 ? (
+                                <View className="items-center justify-center py-20">
+                                    <Ionicons name="construct-outline" size={44} color={iconDim} />
+                                    <Text className="text-txt font-bold text-lg mt-4">{t('common.no_projects')}</Text>
+                                    <Text className="text-txtMuted text-sm mt-2 text-center">{t('common.try_again')}</Text>
+                                </View>
+                            ) : (
+                                visibleProjects.map(project => (
+                                    <ProjectCard
+                                        key={project.id}
+                                        project={project}
+                                        onPress={() => router.push(`/project/${project.id}`)}
+                                    />
+                                ))
+                            )}
+                        </View>
                     </ScrollView>
+
                 )}
             </View>
 

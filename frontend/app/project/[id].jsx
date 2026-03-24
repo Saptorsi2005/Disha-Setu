@@ -328,7 +328,7 @@ export default function ProjectDetailScreen() {
                                     </View>
                                     {m.completed && (
                                         <View className="border border-[#00D4AA]/50 rounded-md px-2 py-0.5">
-                                            <Text className="text-[#00D4AA] text-[10px] font-bold">Done</Text>
+                                            <Text className="text-[#00D4AA] text-[10px] font-bold">{t('common.done')}</Text>
                                         </View>
                                     )}
                                 </View>
@@ -362,7 +362,7 @@ export default function ProjectDetailScreen() {
                             <View className="flex-row items-center gap-1 bg-[#00D4AA]/10 px-2.5 py-1 rounded-md">
                                 <Ionicons name="navigate-outline" size={12} color="#00D4AA" />
                                 <Text className="text-[#00D4AA] text-xs font-semibold">
-                                    {distance < 1 ? `${(distance * 1000).toFixed(0)}m` : `${distance.toFixed(1)}km`} away
+                                    {distance < 1 ? `${(distance * 1000).toFixed(0)}m` : `${distance.toFixed(1)}km`} {t('project.away')}
                                 </Text>
                             </View>
                         )}
@@ -390,7 +390,7 @@ export default function ProjectDetailScreen() {
                             activeOpacity={0.85}
                         >
                             <MaterialIcons name="map" size={18} color="#8B5CF6" />
-                            <Text className="text-[#8B5CF6] font-semibold text-sm">Indoor Navigation</Text>
+                            <Text className="text-[#8B5CF6] font-semibold text-sm">{t('indoor.navigation_tab')}</Text>
                         </TouchableOpacity>
                     )}
 
@@ -431,7 +431,7 @@ export default function ProjectDetailScreen() {
                                         <Text className="text-txtMuted text-sm leading-5 mb-2">{r.description}</Text>
                                         <View className="flex-row items-center justify-between">
                                             <Text className="text-txtMuted text-[10px]">{formatDate(r.created_at)}</Text>
-                                            {r.user_name && <Text className="text-txtMuted text-[10px] font-medium text-right capitalize">By {r.user_name}</Text>}
+                                            {r.user_name && <Text className="text-txtMuted text-[10px] font-medium text-right capitalize">{t('project.by_user', { name: r.user_name })}</Text>}
                                         </View>
                                     </View>
                                 );
@@ -440,7 +440,7 @@ export default function ProjectDetailScreen() {
                     ) : (
                         <View className="bg-card rounded-xl border border-cardBorder p-6 items-center justify-center">
                             <Ionicons name="chatbubbles-outline" size={24} color={iconDim} />
-                            <Text className="text-txtMuted text-sm mt-2 text-center">No reviews yet for this project</Text>
+                            <Text className="text-txtMuted text-sm mt-2 text-center">{t('project.no_reviews')}</Text>
                         </View>
                     )}
                 </View>

@@ -54,6 +54,7 @@ const ROOM_TYPE_ICONS = {
 };
 
 function RoomCard({ room, onPress, isSelected }) {
+    const { t } = useTranslation();
     const iconName = ROOM_TYPE_ICONS[room.type] || 'location-outline';
 
     return (
@@ -80,7 +81,7 @@ function RoomCard({ room, onPress, isSelected }) {
                     {room.room_number && (
                         <View className="flex-row items-center mb-1">
                             <MaterialIcons name="door-front" size={12} color="#9CA3AF" />
-                            <Text className="text-txtMuted text-sm ml-1 font-semibold">Room {room.room_number}</Text>
+                            <Text className="text-txtMuted text-sm ml-1 font-semibold">{t('indoor.room', { number: room.room_number })}</Text>
                         </View>
                     )}
                     <View className={`px-2 py-1 rounded-lg self-start ${isSelected ? 'bg-[#00D4AA]/30' : 'bg-surface'}`}>
@@ -98,6 +99,7 @@ function RoomCard({ room, onPress, isSelected }) {
 }
 
 function DirectionStep({ step, isLast }) {
+    const { t } = useTranslation();
     const iconMap = {
         entrance: 'enter-outline',
         elevator: 'arrow-up-circle',
@@ -123,7 +125,7 @@ function DirectionStep({ step, isLast }) {
                         {step.floorNumber !== undefined && (
                             <View className="flex-row items-center mt-2">
                                 <MaterialIcons name="layers" size={14} color="#9CA3AF" />
-                                <Text className="text-txtMuted text-xs ml-1">Floor {step.floorNumber}</Text>
+                                <Text className="text-txtMuted text-xs ml-1">{t('indoor.floor', { number: step.floorNumber })}</Text>
                             </View>
                         )}
                     </View>
@@ -166,7 +168,7 @@ export default function IndoorNavigationScreen() {
     const { buildingId } = useLocalSearchParams();
     const router = useRouter();
     const { isDark } = useColorScheme();
-    const { i18n } = useTranslation();
+    const { t, i18n } = useTranslation();
 
     // ── Tab state (NEW) ──────────────────────────────────────
     const [activeTab, setActiveTab] = useState('navigation'); // 'navigation' | 'smart'
@@ -228,7 +230,7 @@ export default function IndoorNavigationScreen() {
                 await loadFloorRooms(groundFloor.id);
             }
         } catch (err) {
-            Alert.alert('Error', err.message || 'Failed to load building');
+            Alert.alert(t('common.error'), err.message || t('indoor.not_found'));
         } finally {
             setLoading(false);
         }
@@ -264,7 +266,7 @@ export default function IndoorNavigationScreen() {
             const data = await fetchFloorRooms(floorId);
             setRooms(data);
         } catch (err) {
-            Alert.alert('Error', 'Failed to load rooms');
+            Alert.alert(t('common.error'), t('indoor.loading'));
         }
     };
 
@@ -299,7 +301,7 @@ export default function IndoorNavigationScreen() {
     const selectRoom = (room) => {
         if (!startRoom) {
             setStartRoom(room);
-            Alert.alert('Start Location Set', `Navigate from: ${room.name}`);
+            Alert.alert(t('indoor.select_start'), `${t('indoor.from', { name: '' })} ${room.name}`);
         } else if (!endRoom) {
             setEndRoom(room);
             // Automatically find route
@@ -309,7 +311,7 @@ export default function IndoorNavigationScreen() {
             setStartRoom(room);
             setEndRoom(null);
             setRoute(null);
-            Alert.alert('Start Location Set', `Navigate from: ${room.name}`);
+            Alert.alert(t('indoor.select_start'), `${t('indoor.from', { name: '' })} ${room.name}`);
         }
     };
 
@@ -334,15 +336,15 @@ export default function IndoorNavigationScreen() {
             }
 
             if (!routeData.found) {
-                Alert.alert('No Route Found', routeData.message || 'Cannot find a path between these locations');
+                Alert.alert(t('indoor.no_route'), routeData.message || t('indoor.no_route'));
                 setEndRoom(null);
                 return;
             }
 
             setRoute(routeData);
             const alertTitle = routeData.adjusted
-                ? '⚠️ Route Adjusted'
-                : (routeData.fallback ? '⚠️ Expected Disruption' : 'Route Found');
+                ? `⚠️ ${t('indoor.route_found')}`
+                : (routeData.fallback ? `⚠️ ${t('indoor.no_route')}` : t('indoor.route_found'));
 
             const alertMsg = routeData.adjusted
                 ? `Alternate route used due to: ${(routeData.incidents || []).map(i => i.type.replace('_', ' ')).join(', ')}\nDistance: ${routeData.distance.toFixed(1)}m`
@@ -454,13 +456,13 @@ export default function IndoorNavigationScreen() {
                 setSmartText('');
             }
         } catch {
-            Alert.alert('Error', 'Could not open document picker.');
+            Alert.alert(t('common.error'), t('common.error'));
         }
     };
 
     const runSmartAnalysis = useCallback(async () => {
         if (!smartText.trim() && !smartFile) {
-            Alert.alert('Input required', 'Type a description or upload a document.');
+            Alert.alert(t('common.error'), t('indoor.describe_needs'));
             return;
         }
         setSmartMode('loading');
@@ -486,10 +488,10 @@ export default function IndoorNavigationScreen() {
             if (response.ok) { setSmartResult(data); setSmartMode('result'); }
             else throw new Error(data.error || 'Analysis failed');
         } catch (err) {
-            Alert.alert('Error', err.message || 'Could not analyze document.');
+            Alert.alert(t('common.error'), err.message || t('indoor.analyzing'));
             setSmartMode('input');
         }
-    }, [smartText, smartFile, buildingId]);
+    }, [smartText, smartFile, buildingId, t]);
 
     const resetSmart = () => { setSmartMode('input'); setSmartResult(null); setSmartText(''); setSmartFile(null); };
 
@@ -503,7 +505,7 @@ export default function IndoorNavigationScreen() {
         return (
             <SafeAreaView className="flex-1 bg-main items-center justify-center">
                 <ActivityIndicator size="large" color="#00D4AA" />
-                <Text className="text-txtMuted mt-4">Loading building...</Text>
+                <Text className="text-txtMuted mt-4">{t('indoor.loading')}</Text>
             </SafeAreaView>
         );
     }
@@ -512,9 +514,9 @@ export default function IndoorNavigationScreen() {
         return (
             <SafeAreaView className="flex-1 bg-main items-center justify-center p-6">
                 <Ionicons name="business-outline" size={64} color="#6B7280" />
-                <Text className="text-txt text-xl font-bold mt-4">Building Not Found</Text>
+                <Text className="text-txt text-xl font-bold mt-4">{t('indoor.not_found')}</Text>
                 <TouchableOpacity onPress={() => router.back()} className="mt-6">
-                    <Text className="text-[#00D4AA] font-bold">Go Back</Text>
+                    <Text className="text-[#00D4AA] font-bold">{t('indoor.go_back')}</Text>
                 </TouchableOpacity>
             </SafeAreaView>
         );
@@ -530,13 +532,18 @@ export default function IndoorNavigationScreen() {
                     </TouchableOpacity>
                     <View className="flex-1">
                         <Text className="text-txt text-xl font-bold">{building.name}</Text>
-                        {building.campus && (
-                            <Text className="text-txtMuted text-sm">{building.campus}</Text>
-                        )}
+                        <View className="flex-row items-center mt-1 flex-wrap gap-2">
+                            <View className="bg-[#00D4AA]/10 px-2 py-0.5 rounded-md border border-[#00D4AA]/30">
+                                <Text className="text-[#00D4AA] text-[10px] font-bold uppercase tracking-wider">{t('indoor.demo_tag')}</Text>
+                            </View>
+                            {building.campus && (
+                                <Text className="text-txtMuted text-sm">{building.campus}</Text>
+                            )}
+                        </View>
                     </View>
                     {activeTab === 'smart' && smartMode === 'result' && (
                         <TouchableOpacity onPress={resetSmart} className="bg-surface px-3 py-1 rounded-full border border-cardBorder">
-                            <Text className="text-txtMuted text-xs font-bold">Reset</Text>
+                            <Text className="text-txtMuted text-xs font-bold">{t('indoor.reset')}</Text>
                         </TouchableOpacity>
                     )}
                 </View>
@@ -550,7 +557,7 @@ export default function IndoorNavigationScreen() {
                     >
                         <Ionicons name="map-outline" size={16} color={activeTab === 'navigation' ? '#0A0F1E' : '#9CA3AF'} />
                         <Text className={`font-bold text-sm ${activeTab === 'navigation' ? 'text-[#0A0F1E]' : 'text-txtMuted'
-                            }`}>Navigation</Text>
+                            }`}>{t('indoor.navigation_tab')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                         onPress={() => setActiveTab('smart')}
@@ -559,7 +566,7 @@ export default function IndoorNavigationScreen() {
                     >
                         <Ionicons name="sparkles-outline" size={16} color={activeTab === 'smart' ? '#0A0F1E' : '#9CA3AF'} />
                         <Text className={`font-bold text-sm ${activeTab === 'smart' ? 'text-[#0A0F1E]' : 'text-txtMuted'
-                            }`}>Smart Assist</Text>
+                            }`}>{t('indoor.smart_assist_tab')}</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -659,7 +666,7 @@ export default function IndoorNavigationScreen() {
                         <Ionicons name="search" size={20} color="#9CA3AF" />
                         <TextInput
                             className="flex-1 ml-3 text-txt"
-                            placeholder="Search rooms, departments..."
+                            placeholder={t('indoor.search_placeholder')}
                             placeholderTextColor="#6B7280"
                             value={searchQuery}
                             onChangeText={handleSearch}
@@ -678,23 +685,23 @@ export default function IndoorNavigationScreen() {
                                 <View className="flex-row items-center">
                                     <View className="w-2 h-2 rounded-full bg-[#00D4AA] mr-2" />
                                     <Text className="text-[#00D4AA] font-bold text-base">
-                                        {!startRoom ? 'Select Start' : !endRoom ? 'Select Destination' : 'Route Found'}
+                                        {!startRoom ? t('indoor.select_start') : !endRoom ? t('indoor.select_dest') : t('indoor.route_found')}
                                     </Text>
                                 </View>
                                 <TouchableOpacity onPress={resetNavigation} className="bg-[#EF4444] px-3 py-1.5 rounded-lg">
-                                    <Text className="text-white font-bold text-xs">Reset</Text>
+                                    <Text className="text-white font-bold text-xs">{t('indoor.reset')}</Text>
                                 </TouchableOpacity>
                             </View>
                             {startRoom && (
                                 <View className="flex-row items-center mb-1">
                                     <Ionicons name="location" size={14} color="#00D4AA" />
-                                    <Text className="text-txt text-sm font-semibold ml-2">From: {startRoom.name}</Text>
+                                    <Text className="text-txt text-sm font-semibold ml-2">{t('indoor.from', { name: startRoom.name })}</Text>
                                 </View>
                             )}
                             {endRoom && (
                                 <View className="flex-row items-center">
                                     <Ionicons name="flag" size={14} color="#00D4AA" />
-                                    <Text className="text-txt text-sm font-semibold ml-2">To: {endRoom.name}</Text>
+                                    <Text className="text-txt text-sm font-semibold ml-2">{t('indoor.to', { name: endRoom.name })}</Text>
                                 </View>
                             )}
                         </View>
@@ -705,7 +712,7 @@ export default function IndoorNavigationScreen() {
             {/* Floor Selector — Navigation tab only */}
             {activeTab === 'navigation' && !searchMode && building.floors && building.floors.length > 0 && (
                 <View className="bg-main border-b border-cardBorder">
-                    <Text className="text-txtMuted text-xs font-bold uppercase tracking-wider px-5 pt-3">Select Floor</Text>
+                    <Text className="text-txtMuted text-xs font-bold uppercase tracking-wider px-5 pt-3">{t('indoor.select_floor')}</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} className="px-5 py-3">
                         {building.floors.map((floor) => (
                             <TouchableOpacity
@@ -722,7 +729,7 @@ export default function IndoorNavigationScreen() {
                             >
                                 <Text className={`font-bold text-base ${selectedFloor?.id === floor.id ? 'text-[#0A0F1E]' : 'text-txt'
                                     }`}>
-                                    {floor.name || `Floor ${floor.floor_number}`}
+                                    {floor.name || t('indoor.floor', { number: floor.floor_number })}
                                 </Text>
                             </TouchableOpacity>
                         ))}
@@ -740,14 +747,14 @@ export default function IndoorNavigationScreen() {
                             <View className="bg-card rounded-2xl p-5 mb-5 border border-cardBorder">
                                 <View className="flex-row items-center justify-between">
                                     <View className="flex-1">
-                                        <Text className="text-[#00D4AA] text-sm font-bold uppercase tracking-wider mb-1">Turn-by-Turn</Text>
-                                        <Text className="text-txt text-2xl font-bold">Directions</Text>
+                                        <Text className="text-[#00D4AA] text-sm font-bold uppercase tracking-wider mb-1">{t('indoor.turn_by_turn')}</Text>
+                                        <Text className="text-txt text-2xl font-bold">{t('indoor.directions')}</Text>
                                     </View>
                                     <View className="items-end">
                                         <View className="bg-[#00D4AA] px-4 py-2.5 rounded-full">
                                             <Text className="text-[#0A0F1E] font-bold text-lg">{route.distance.toFixed(0)}m</Text>
                                         </View>
-                                        <Text className="text-txtMuted text-xs mt-1">Total Distance</Text>
+                                        <Text className="text-txtMuted text-xs mt-1">{t('indoor.total_distance')}</Text>
                                     </View>
                                 </View>
                             </View>
@@ -760,7 +767,7 @@ export default function IndoorNavigationScreen() {
                                     style={{ shadowColor: '#00D4AA', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 4 }}
                                 >
                                     <Ionicons name="navigate" size={18} color="#0A0F1E" />
-                                    <Text className="text-[#0A0F1E] font-bold text-base ml-2">▶ Start Navigation</Text>
+                                    <Text className="text-[#0A0F1E] font-bold text-base ml-2">▶ {t('indoor.start_nav')}</Text>
                                 </TouchableOpacity>
                             ) : (
                                 <View className="flex-row mb-5" style={{ gap: 10 }}>
@@ -768,7 +775,7 @@ export default function IndoorNavigationScreen() {
                                         onPress={stopNavigating}
                                         className="flex-1 bg-surface border border-cardBorder rounded-2xl py-3 items-center"
                                     >
-                                        <Text className="text-txtMuted font-bold text-sm">✕ Stop</Text>
+                                        <Text className="text-txtMuted font-bold text-sm">✕ {t('indoor.stop_nav')}</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity
                                         onPress={goNextStep}
@@ -776,7 +783,7 @@ export default function IndoorNavigationScreen() {
                                         style={{ shadowColor: '#00D4AA', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 4 }}
                                     >
                                         <Text className="text-[#0A0F1E] font-bold text-base">
-                                            {currentStepIndex >= route.directions.length - 1 ? '✓ Arrived!' : 'Next Step →'}
+                                            {currentStepIndex >= route.directions.length - 1 ? `✓ ${t('indoor.arrived')}` : `${t('indoor.next_step')} →`}
                                         </Text>
                                     </TouchableOpacity>
                                 </View>
@@ -808,7 +815,7 @@ export default function IndoorNavigationScreen() {
                             <View className="bg-[#10B981]/10 rounded-2xl p-4 border border-[#10B981]/30 mt-4">
                                 <View className="flex-row items-center justify-center">
                                     <Ionicons name="checkmark-circle" size={24} color="#10B981" />
-                                    <Text className="text-[#10B981] font-bold text-lg ml-2">You have arrived!</Text>
+                                    <Text className="text-[#10B981] font-bold text-lg ml-2">{t('indoor.arrived')}</Text>
                                 </View>
                             </View>
                         </View>
@@ -825,7 +832,7 @@ export default function IndoorNavigationScreen() {
                     ) : searchMode ? (
                         <View className="items-center justify-center py-12">
                             <Ionicons name="search-outline" size={48} color="#6B7280" />
-                            <Text className="text-txtMuted mt-4">No results found</Text>
+                            <Text className="text-txtMuted mt-4">{t('common.no_results')}</Text>
                         </View>
                     ) : (
                         <View>
@@ -855,7 +862,7 @@ export default function IndoorNavigationScreen() {
                                     <View className="bg-[#3B82F6]/20 p-2 rounded-full mr-3">
                                         <Ionicons name="sparkles" size={20} color="#60A5FA" />
                                     </View>
-                                    <Text className="text-white font-bold text-base flex-1">Smart Route Generator</Text>
+                                    <Text className="text-white font-bold text-base flex-1">{t('indoor.smart_assist_tab')}</Text>
                                 </View>
                                 <Text className="text-[#9CA3AF] text-sm leading-5">
                                     Describe your visit or upload a document — we'll automatically extract your needs and map your exact navigation route.
@@ -863,11 +870,11 @@ export default function IndoorNavigationScreen() {
                             </View>
 
                             {/* Text Input */}
-                            <Text className="text-txt font-bold mb-2">Describe your needs</Text>
+                            <Text className="text-txt font-bold mb-2">{t('indoor.describe_needs')}</Text>
                             <TextInput
                                 className="bg-surface border border-cardBorder rounded-2xl p-4 text-txt mb-4"
                                 style={{ minHeight: 100, textAlignVertical: 'top' }}
-                                placeholder="Describe your needs (e.g., find a room, office, help desk, or service)"
+                                placeholder={t('indoor.describe_needs')}
                                 placeholderTextColor="#6B7280"
                                 multiline
                                 value={smartText}
@@ -888,7 +895,7 @@ export default function IndoorNavigationScreen() {
                             >
                                 <Ionicons name="cloud-upload-outline" size={36} color={smartFile ? '#F59E0B' : '#6B7280'} />
                                 <Text className="text-txt font-semibold mt-2">
-                                    {smartFile ? smartFile.name : 'Upload Document'}
+                                    {smartFile ? smartFile.name : t('indoor.another_route')}
                                 </Text>
                                 <Text className="text-txtMuted text-xs mt-1">PDF, TXT, or Image (max 5MB)</Text>
                             </TouchableOpacity>
@@ -901,7 +908,7 @@ export default function IndoorNavigationScreen() {
                                 activeOpacity={0.85}
                             >
                                 <Ionicons name="sparkles-outline" size={20} color="#000" />
-                                <Text className="text-black font-bold text-base">Generate My Route</Text>
+                                <Text className="text-black font-bold text-base">{t('indoor.generate_route')}</Text>
                             </TouchableOpacity>
 
                             <View className="flex-row items-center justify-center mt-4">
@@ -916,8 +923,8 @@ export default function IndoorNavigationScreen() {
                             <View className="w-20 h-20 rounded-full bg-surface items-center justify-center mb-4 border border-cardBorder">
                                 <ActivityIndicator size="large" color="#F59E0B" />
                             </View>
-                            <Text className="text-txt font-bold text-lg">Analyzing Document...</Text>
-                            <Text className="text-txtMuted text-sm mt-1">Extracting intents & building your route</Text>
+                            <Text className="text-txt font-bold text-lg">{t('indoor.analyzing')}</Text>
+                            <Text className="text-txtMuted text-sm mt-1">{t('indoor.loading')}</Text>
                         </View>
                     )}
 
@@ -930,7 +937,7 @@ export default function IndoorNavigationScreen() {
                                         <View className="bg-card rounded-2xl p-4 mb-4 border border-cardBorder">
                                             <View className="flex-row items-center mb-2">
                                                 <Ionicons name="sparkles" size={16} color="#F59E0B" />
-                                                <Text className="text-[#F59E0B] font-bold text-sm ml-2 uppercase tracking-wider">Detected Needs</Text>
+                                                <Text className="text-[#F59E0B] font-bold text-sm ml-2 uppercase tracking-wider">{t('indoor.detected_needs')}</Text>
                                             </View>
                                             <View className="flex-row flex-wrap">
                                                 {smartResult.intents.map((intent, i) => (
@@ -945,7 +952,7 @@ export default function IndoorNavigationScreen() {
                                     {/* Visit Order */}
                                     {smartResult.steps?.length > 0 && (
                                         <View className="mb-4">
-                                            <Text className="text-txtMuted text-xs font-semibold uppercase tracking-wider mb-2">Your Visit Order</Text>
+                                            <Text className="text-txtMuted text-xs font-semibold uppercase tracking-wider mb-2">{t('indoor.visit_order')}</Text>
                                             <View className="flex-row flex-wrap">
                                                 {smartResult.steps.map((step, i) => (
                                                     <View key={i} className="flex-row items-center bg-card rounded-full px-3 py-1.5 mr-2 mb-2 border border-cardBorder">
@@ -961,7 +968,7 @@ export default function IndoorNavigationScreen() {
                                     <View className="bg-[#F59E0B]/10 border border-[#F59E0B]/30 rounded-3xl p-5 mb-4">
                                         <View className="flex-row items-center justify-between">
                                             <View className="flex-1">
-                                                <Text className="text-[#F59E0B] text-xs font-bold uppercase tracking-wider mb-1">Auto-Generated Route</Text>
+                                                <Text className="text-[#F59E0B] text-xs font-bold uppercase tracking-wider mb-1">{t('indoor.auto_route')}</Text>
                                                 <Text className="text-txt text-lg font-bold">{smartResult.route.from?.name} → {smartResult.route.to?.name}</Text>
                                                 <Text className="text-txtMuted text-xs mt-1">{smartResult.steps?.length} stops</Text>
                                             </View>
@@ -969,7 +976,7 @@ export default function IndoorNavigationScreen() {
                                                 <View className="bg-[#F59E0B] px-4 py-2 rounded-full">
                                                     <Text className="text-black font-bold text-lg">{smartResult.route.totalDistance?.toFixed(0)}m</Text>
                                                 </View>
-                                                <Text className="text-txtMuted text-xs mt-1">Total</Text>
+                                                <Text className="text-txtMuted text-xs mt-1">{t('indoor.total_distance')}</Text>
                                             </View>
                                         </View>
                                     </View>
@@ -998,12 +1005,12 @@ export default function IndoorNavigationScreen() {
                                             style={{ shadowColor: '#F59E0B', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 4 }}
                                         >
                                             <Ionicons name="navigate" size={18} color="#000" />
-                                            <Text className="text-black font-bold text-base ml-2">▶ Start Navigation</Text>
+                                            <Text className="text-black font-bold text-base ml-2">▶ {t('indoor.start_nav')}</Text>
                                         </TouchableOpacity>
                                     ) : (
                                         <View className="flex-row mb-4" style={{ gap: 10 }}>
                                             <TouchableOpacity onPress={stopNavigating} className="flex-1 bg-surface border border-cardBorder rounded-2xl py-3 items-center">
-                                                <Text className="text-txtMuted font-bold text-sm">✕ Stop</Text>
+                                                <Text className="text-txtMuted font-bold text-sm">✕ {t('indoor.stop_nav')}</Text>
                                             </TouchableOpacity>
                                             <TouchableOpacity
                                                 onPress={() => {
@@ -1030,7 +1037,7 @@ export default function IndoorNavigationScreen() {
                                                 style={{ shadowColor: '#F59E0B', shadowOpacity: 0.4, shadowRadius: 8, elevation: 4 }}
                                             >
                                                 <Text className="text-black font-bold text-base">
-                                                    {currentStepIndex >= (smartResult.route?.directions?.length ?? 0) - 1 ? '✓ Arrived!' : 'Next Step →'}
+                                                    {currentStepIndex >= (smartResult.route?.directions?.length ?? 0) - 1 ? `✓ ${t('indoor.arrived')}` : `${t('indoor.next_step')} →`}
                                                 </Text>
                                             </TouchableOpacity>
                                         </View>
@@ -1055,7 +1062,7 @@ export default function IndoorNavigationScreen() {
 
                                     <View className="bg-[#10B981]/15 border border-[#10B981]/40 rounded-2xl p-4 mb-4 flex-row items-center justify-center">
                                         <Ionicons name="checkmark-circle" size={22} color="#10B981" />
-                                        <Text className="text-[#10B981] font-bold text-base ml-2">Route Ready!</Text>
+                                        <Text className="text-[#10B981] font-bold text-base ml-2">{t('indoor.route_ready')}</Text>
                                     </View>
 
                                     {/* Reset Button to generate another route */}
@@ -1064,7 +1071,7 @@ export default function IndoorNavigationScreen() {
                                         className="mb-8 border border-[#374151] bg-[#1A2035] rounded-2xl py-3 flex-row items-center justify-center"
                                     >
                                         <Ionicons name="refresh-outline" size={18} color="#9CA3AF" />
-                                        <Text className="text-[#9CA3AF] font-bold text-base ml-2">Generate Another Route</Text>
+                                        <Text className="text-[#9CA3AF] font-bold text-base ml-2">{t('indoor.another_route')}</Text>
                                     </TouchableOpacity>
                                 </>
                             ) : (
@@ -1072,10 +1079,10 @@ export default function IndoorNavigationScreen() {
                                     <View className="w-16 h-16 rounded-full bg-surface items-center justify-center mb-4 border border-cardBorder">
                                         <Ionicons name="warning-outline" size={32} color="#F59E0B" />
                                     </View>
-                                    <Text className="text-txt text-xl font-bold text-center">Could Not Generate Route</Text>
+                                    <Text className="text-txt text-xl font-bold text-center">{t('indoor.no_route')}</Text>
                                     <Text className="text-txtMuted text-sm mt-2 text-center px-6 leading-5">{smartResult.message}</Text>
                                     <TouchableOpacity onPress={resetSmart} className="mt-8 bg-surface border border-cardBorder px-8 py-3 rounded-2xl">
-                                        <Text className="text-txt font-bold">Try Again</Text>
+                                        <Text className="text-txt font-bold">{t('common.try_again')}</Text>
                                     </TouchableOpacity>
                                 </View>
                             )}

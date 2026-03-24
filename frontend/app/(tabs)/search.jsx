@@ -62,11 +62,11 @@ export default function SearchScreen() {
             const cat = getProjectCategory(p);
             if (cat && cat !== 'Other') cats.add(normalize(cat));
         });
-        
+
         const unique = Array.from(cats)
             .filter(Boolean)
             .map(c => c.charAt(0).toUpperCase() + c.slice(1));
-            
+
         return ['All', ...unique];
     }, [allProjects]);
 
@@ -85,11 +85,11 @@ export default function SearchScreen() {
             if (!q) return true;
 
             return normalize(p.name)?.includes(q) ||
-                   normalize(p.description)?.includes(q) ||
-                   normalize(p.city)?.includes(q) ||
-                   normalize(p.area)?.includes(q) ||
-                   normalize(p.district)?.includes(q) ||
-                   normalize(p.id)?.includes(q);
+                normalize(p.description)?.includes(q) ||
+                normalize(p.city)?.includes(q) ||
+                normalize(p.area)?.includes(q) ||
+                normalize(p.district)?.includes(q) ||
+                normalize(p.id)?.includes(q);
         });
     }, [allProjects, selectedCategory, query]);
 

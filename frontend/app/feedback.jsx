@@ -13,19 +13,21 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import * as ImagePicker from 'expo-image-picker';
 import InlineCropEditor from '../components/InlineCropEditor';
 import { useColorScheme } from '../hooks/use-color-scheme';
+import { useTranslation } from 'react-i18next';
 import { submitFeedback } from '../services/feedbackService';
 import { detectAIImage } from '../utils/aiImageDetector';
 
 const CATEGORIES = [
-    { id: 'delay', label: 'Delay', icon: 'time-outline', color: '#F59E0B' },
-    { id: 'safety', label: 'Safety', icon: 'shield-outline', color: '#EF4444' },
-    { id: 'noise', label: 'Noise', icon: 'volume-high-outline', color: '#8B5CF6' },
-    { id: 'traffic', label: 'Traffic', icon: 'car-outline', color: '#F97316' },
-    { id: 'corruption', label: 'Corruption', icon: 'alert-circle-outline', color: '#EC4899' },
-    { id: 'other', label: 'Other', icon: 'help-circle-outline', color: '#6B7280' },
+    { id: 'delay', labelKey: 'feedback.categories.delay', icon: 'time-outline', color: '#F59E0B' },
+    { id: 'safety', labelKey: 'feedback.categories.safety', icon: 'shield-outline', color: '#EF4444' },
+    { id: 'noise', labelKey: 'feedback.categories.noise', icon: 'volume-high-outline', color: '#8B5CF6' },
+    { id: 'traffic', labelKey: 'feedback.categories.traffic', icon: 'car-outline', color: '#F97316' },
+    { id: 'corruption', labelKey: 'feedback.categories.corruption', icon: 'alert-circle-outline', color: '#EC4899' },
+    { id: 'other', labelKey: 'feedback.categories.other', icon: 'help-circle-outline', color: '#6B7280' },
 ];
 
 export default function FeedbackScreen() {
+    const { t } = useTranslation();
     const router = useRouter();
     const { projectId, projectName } = useLocalSearchParams();
     const { isDark } = useColorScheme();
@@ -51,7 +53,7 @@ export default function FeedbackScreen() {
     const handlePickPhoto = async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
-            Alert.alert('Permission Required', 'Please allow photo access to attach a photo.');
+            Alert.alert(t('common.error'), t('settings.simulation_active')); // Generic permission message might need a key
             return;
         }
         const result = await ImagePicker.launchImageLibraryAsync({
@@ -87,14 +89,14 @@ export default function FeedbackScreen() {
     };
 
     const handleSubmit = async () => {
-        if (!category) return Alert.alert('Select a category', 'Please choose an issue type first.');
-        if (description.trim().length < 10) return Alert.alert('Description too short', 'Please describe the issue in at least 10 characters.');
+        if (!category) return Alert.alert(t('feedback.issue_type'), t('feedback.placeholder_desc'));
+        if (description.trim().length < 10) return Alert.alert(t('feedback.description'), t('feedback.placeholder_desc'));
 
         // ── Double-check AI validation before API call ──────────────────────
         if (photo && aiValidation === 'ai') {
             return Alert.alert(
-                'Image Not Accepted',
-                'This image appears to be AI-generated. Please upload a real photo.'
+                t('feedback.ai_detected'),
+                t('feedback.ai_detected')
             );
         }
 
@@ -109,7 +111,7 @@ export default function FeedbackScreen() {
             setTicket(data.ticketId);
             setStep(3);
         } catch (err) {
-            Alert.alert('Submission failed', err.message || 'Please try again.');
+            Alert.alert(t('common.error'), err.message || t('common.error'));
         } finally {
             setLoading(false);
         }
@@ -126,7 +128,7 @@ export default function FeedbackScreen() {
                     <Ionicons name="arrow-back" size={24} color={iconDim} />
                 </TouchableOpacity>
                 <Text className="text-txt text-lg font-bold">
-                    {step === 3 ? 'Report Submitted' : 'Report an Issue'}
+                    {step === 3 ? t('feedback.submitted_title') : t('feedback.title')}
                 </Text>
             </View>
 
@@ -136,23 +138,23 @@ export default function FeedbackScreen() {
                     <View className="w-24 h-24 rounded-full bg-[#00D4AA20] items-center justify-center mb-6">
                         <Ionicons name="checkmark-circle" size={48} color="#00D4AA" />
                     </View>
-                    <Text className="text-txt text-2xl font-bold mb-3 text-center">Thank You!</Text>
+                    <Text className="text-txt text-2xl font-bold mb-3 text-center">{t('feedback.thank_you')}</Text>
                     <Text className="text-txtMuted text-center text-sm leading-6 mb-8">
-                        Your report has been submitted successfully. We'll track this and notify you of updates.
+                        {t('feedback.success_msg')}
                     </Text>
                     <View className="bg-card rounded-2xl p-5 w-full border border-cardBorder mb-8">
-                        <Text className="text-txtMuted text-xs text-center mb-2">Ticket ID</Text>
+                        <Text className="text-txtMuted text-xs text-center mb-2">{t('feedback.ticket_id')}</Text>
                         <Text className="text-[#00D4AA] text-3xl font-bold text-center tracking-widest">{ticket}</Text>
-                        <Text className="text-txtMuted text-xs text-center mt-2">Save this ID to track your report</Text>
+                        <Text className="text-txtMuted text-xs text-center mt-2">{t('feedback.save_id')}</Text>
                     </View>
                     <TouchableOpacity
                         className="w-full bg-[#00D4AA] rounded-2xl py-4 items-center mb-4"
                         onPress={() => router.back()}
                     >
-                        <Text className="text-main font-bold text-base">Back to Project</Text>
+                        <Text className="text-main font-bold text-base">{t('feedback.back_to_project')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => { setStep(1); setCategory(null); setDescription(''); setPhoto(null); setPhotoAspect(null); setAiValidation(null); }}>
-                        <Text className="text-txtMuted text-sm">Submit another report</Text>
+                        <Text className="text-txtMuted text-sm">{t('feedback.submit_another')}</Text>
                     </TouchableOpacity>
                 </View>
             ) : (
@@ -163,13 +165,13 @@ export default function FeedbackScreen() {
                 >
                     {projectName && (
                         <View className="bg-card rounded-2xl p-4 border border-cardBorder mb-6">
-                            <Text className="text-txtMuted text-xs mb-1">Reporting for</Text>
+                            <Text className="text-txtMuted text-xs mb-1">{t('feedback.reporting_for')}</Text>
                             <Text className="text-txt font-bold" numberOfLines={1}>{projectName}</Text>
                         </View>
                     )}
 
                     {/* Step 1: Category */}
-                    <Text className="text-txt font-bold text-base mb-4">Issue Type</Text>
+                    <Text className="text-txt font-bold text-base mb-4">{t('feedback.issue_type')}</Text>
                     <View className="flex-row flex-wrap gap-3 mb-8">
                         {CATEGORIES.map(cat => (
                             <TouchableOpacity
@@ -183,18 +185,18 @@ export default function FeedbackScreen() {
                             >
                                 <Ionicons name={cat.icon} size={16} color={category === cat.id ? cat.color : iconDim} />
                                 <Text className="ml-2 font-semibold text-sm" style={{ color: category === cat.id ? cat.color : isDark ? '#9CA3AF' : '#6B7280' }}>
-                                    {cat.label}
+                                    {t(cat.labelKey)}
                                 </Text>
                             </TouchableOpacity>
                         ))}
                     </View>
 
                     {/* Step 2: Description */}
-                    <Text className="text-txt font-bold text-base mb-4">Description</Text>
+                    <Text className="text-txt font-bold text-base mb-4">{t('feedback.description')}</Text>
                     <TextInput
                         className="bg-card border border-cardBorder rounded-2xl p-4 text-txt text-sm leading-6 mb-6"
                         style={{ minHeight: 120, textAlignVertical: 'top' }}
-                        placeholder="Describe the issue clearly..."
+                        placeholder={t('feedback.placeholder_desc')}
                         placeholderTextColor={iconDim}
                         multiline
                         value={description}
@@ -202,7 +204,7 @@ export default function FeedbackScreen() {
                     />
 
                     {/* Photo attachment */}
-                    <Text className="text-txt font-bold text-base mb-4">Photo (optional)</Text>
+                    <Text className="text-txt font-bold text-base mb-4">{t('feedback.photo_optional')}</Text>
 
                     {pendingPhoto ? (
                         /* ── Inline crop editor — appears in place of the picker ── */
@@ -236,12 +238,12 @@ export default function FeedbackScreen() {
                                     >
                                         <Ionicons name="close" size={20} color="white" />
                                     </TouchableOpacity>
-                                    <Text className="text-[#00D4AA] text-sm text-center mt-3 font-semibold">Tap to change photo</Text>
+                                    <Text className="text-[#00D4AA] text-sm text-center mt-3 font-semibold">{t('feedback.tap_change')}</Text>
                                 </View>
                             ) : (
                                 <>
                                     <Ionicons name="camera-outline" size={32} color={iconDim} />
-                                    <Text className="text-txtMuted text-sm mt-3">Tap to attach a photo</Text>
+                                    <Text className="text-txtMuted text-sm mt-3">{t('feedback.tap_attach')}</Text>
                                 </>
                             )}
                         </TouchableOpacity>
@@ -250,17 +252,17 @@ export default function FeedbackScreen() {
                     {/* ── AI Validation Feedback (inline, below photo area) ── */}
                     {aiValidation === 'checking' && (
                         <Text className="text-[#F59E0B] text-xs mb-6 text-center italic">
-                            Analyzing image authenticity...
+                            {t('feedback.ai_checking')}
                         </Text>
                     )}
                     {aiValidation === 'real' && (
                         <Text className="text-[#10B981] text-xs mb-6 text-center font-semibold">
-                            ✔ Real image verified
+                            ✔ {t('feedback.ai_real')}
                         </Text>
                     )}
                     {aiValidation === 'ai' && (
                         <Text className="text-[#EF4444] text-xs mb-6 text-center font-semibold">
-                            ❌ AI-generated image detected. Please upload a real photo.
+                            ❌ {t('feedback.ai_detected')}
                         </Text>
                     )}
                     {/* ─────────────────────────────────────────────────────── */}
@@ -280,7 +282,7 @@ export default function FeedbackScreen() {
                         onPress={handleSubmit}
                         disabled={submitDisabled}
                     >
-                        {loading ? <ActivityIndicator color="#000" /> : <Text className="text-main font-bold text-base">Submit Report</Text>}
+                        {loading ? <ActivityIndicator color="#000" /> : <Text className="text-main font-bold text-base">{t('feedback.submit_btn')}</Text>}
                     </TouchableOpacity>
                 </ScrollView>
             )}

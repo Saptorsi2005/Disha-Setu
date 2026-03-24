@@ -29,7 +29,7 @@ function ActivityItem({ report, isLast, onPress }) {
     const timeAgo = formatRelativeTime(report.created_at);
 
     return (
-        <TouchableOpacity 
+        <TouchableOpacity
             onPress={onPress}
             activeOpacity={0.7}
             className={`py-4 flex-row items-start ${!isLast ? 'border-b border-cardBorder' : ''}`}
