@@ -26,7 +26,10 @@ import { BASE_URL } from '../../services/api';
 const SERVER_ROOT = BASE_URL.replace(/\/api\/?$/, '');
 
 import ZeroReadOverlayUI from '../../components/ZeroReadOverlayUI';
+import IndoorMapView from '../../components/IndoorMapView';
+import MapFloorSelector from '../../components/MapFloorSelector';
 import { VoiceHapticEngine } from '../../services/VoiceHapticEngine';
+import { fetchFloorConnections } from '../../services/indoorNavigationService';
 import { useTranslation } from 'react-i18next';
 
 
@@ -208,6 +211,16 @@ export default function IndoorNavigationScreen() {
     const [routeIncidents, setRouteIncidents] = useState([]); // incidents affecting the current route
 
 
+
+    // ── Map View state ─────────────────────────────────────────────────────
+    const [mapFloor, setMapFloor] = useState(null);
+    const [mapRooms, setMapRooms] = useState([]);
+    const [mapConnections, setMapConnections] = useState([]);
+    const [mapNavigating, setMapNavigating] = useState(false);
+    const [mapStepIndex, setMapStepIndex] = useState(0);
+    const mapStepRef = useRef(0);
+    const mapTimerRef = useRef(null);
+    const mapFloorRef = useRef(null);
 
     // UI tracking refs
     const navScrollViewRef = useRef(null);
@@ -428,7 +441,102 @@ export default function IndoorNavigationScreen() {
 
     const stopNavigating = () => { setNavigating(false); setCurrentStepIndex(-1); setActiveInsight(null); };
 
+    // ── Map View helpers ────────────────────────────────────────────────────
+    /** Load rooms + connections for the given floor into map state */
+    const loadMapFloorData = async (floor) => {
+        if (!floor) return;
+        setMapFloor(floor);
+        mapFloorRef.current = floor;   // keep ref in sync
+        try {
+            const [flRooms, flConns] = await Promise.all([
+                fetchFloorRooms(floor.id),
+                fetchFloorConnections(floor.id),
+            ]);
+            setMapRooms(flRooms);
+            setMapConnections(flConns);
+        } catch (err) {
+            console.error('Map data load error:', err);
+        }
+    };
+
+    /** Switch to map tab and load the floor that contains the route's start room */
+    const openMapView = async () => {
+        setActiveTab('map');
+        // Find the floor containing the start room
+        const startFloor = building?.floors?.find(
+            f => rooms.some(r => r.id === startRoom?.id) || f.id === selectedFloor?.id
+        ) || selectedFloor || building?.floors?.[0];
+        await loadMapFloorData(startFloor);
+    };
+
+    /** Stop map auto-navigation timer */
+    const stopMapNavigation = () => {
+        if (mapTimerRef.current) {
+            clearTimeout(mapTimerRef.current);
+            mapTimerRef.current = null;
+        }
+        setMapNavigating(false);
+    };
+
+    /** Start map auto-navigation: advances step based on dynamic pacing */
+    const startMapNavigation = () => {
+        const dirs = route?.directions || [];
+        if (!dirs.length) return;
+        stopMapNavigation();
+        VoiceHapticEngine.reset();   // clear dedup guard + stop any lingering speech
+        mapStepRef.current = 0;
+        setMapStepIndex(0);
+        setMapNavigating(true);
+
+        // Announce step 0 immediately
+        if (dirs[0]) VoiceHapticEngine.triggerInstruction(dirs[0], i18n.language, true);
+
+        // Recursive timeout for dynamic pacing based on sentence length
+        const scheduleNextStep = () => {
+            const currentIdx = mapStepRef.current;
+            if (currentIdx >= dirs.length - 1) {
+                stopMapNavigation();
+                setMapStepIndex(dirs.length - 1);
+                return;
+            }
+
+            // Estimate time based on instruction length (approx 75ms per character + 1s base padding)
+            // Or default to 2.5s if not available
+            const currentInstructionText = dirs[currentIdx]?.instruction || '';
+            const delayMs = Math.max(2500, currentInstructionText.length * 75 + 1000);
+
+            mapTimerRef.current = setTimeout(() => {
+                mapStepRef.current += 1;
+                const nextIdx = mapStepRef.current;
+
+                setMapStepIndex(nextIdx);
+
+                if (dirs[nextIdx]) {
+                    VoiceHapticEngine.triggerInstruction(dirs[nextIdx], i18n.language);
+                    
+                    // Auto-switch floor: use mapFloorRef (always fresh)
+                    const stepFloor = building?.floors?.find(
+                        f => f.floor_number === dirs[nextIdx].floorNumber
+                    );
+                    if (stepFloor && stepFloor.id !== mapFloorRef.current?.id) {
+                        loadMapFloorData(stepFloor);
+                    }
+                }
+
+                // Schedule next
+                scheduleNextStep();
+
+            }, delayMs);
+        };
+
+        // Kick off the loop
+        scheduleNextStep();
+    };
+
     const resetNavigation = () => {
+        stopMapNavigation();
+        VoiceHapticEngine.reset();   // stop speech + reset dedup for next route
+        setMapStepIndex(0);
         setStartRoom(null);
         setEndRoom(null);
         setRoute(null);
@@ -441,6 +549,7 @@ export default function IndoorNavigationScreen() {
         setNavigating(false);
         setCurrentStepIndex(-1);
     };
+
 
     // ── Smart Assist handlers (NEW) ─────────────────────────
     const pickSmartDocument = async () => {
@@ -499,6 +608,9 @@ export default function IndoorNavigationScreen() {
         loadIncidents();
     }, [loadBuilding, loadInsights, loadIncidents]);
 
+    // Cleanup map timer on unmount
+    useEffect(() => () => { if (mapTimerRef.current) clearTimeout(mapTimerRef.current); }, []);
+
     if (loading) {
         return (
             <SafeAreaView className="flex-1 bg-main items-center justify-center">
@@ -526,7 +638,8 @@ export default function IndoorNavigationScreen() {
             <View className="px-5 pt-4 border-b border-cardBorder">
                 <View className="flex-row items-center mb-3">
                     <TouchableOpacity onPress={() => router.back()} className="mr-3">
-                        <Ionicons name="arrow-back" size={24} color={activeTab === 'smart' ? '#F59E0B' : '#00D4AA'} />
+                        <Ionicons name="arrow-back" size={24} color={activeTab === 'smart' ? '#F59E0B' : activeTab === 'map' ? '#3B82F6' : '#00D4AA'} />
+
                     </TouchableOpacity>
                     <View className="flex-1">
                         <Text className="text-txt text-xl font-bold">{building.name}</Text>
@@ -541,25 +654,28 @@ export default function IndoorNavigationScreen() {
                     )}
                 </View>
 
-                {/* ── Tab Bar (NEW) ── */}
+                {/* ── Tab Bar ── */}
                 <View className="flex-row mb-1 bg-card rounded-2xl p-1 border border-cardBorder">
                     <TouchableOpacity
                         onPress={() => setActiveTab('navigation')}
-                        className={`flex-1 py-2.5 rounded-xl flex-row items-center justify-center gap-1 ${activeTab === 'navigation' ? 'bg-[#00D4AA]' : ''
-                            }`}
+                        className={`flex-1 py-2.5 rounded-xl flex-row items-center justify-center gap-1 ${activeTab === 'navigation' ? 'bg-[#00D4AA]' : ''}`}
                     >
-                        <Ionicons name="map-outline" size={16} color={activeTab === 'navigation' ? '#0A0F1E' : '#9CA3AF'} />
-                        <Text className={`font-bold text-sm ${activeTab === 'navigation' ? 'text-[#0A0F1E]' : 'text-txtMuted'
-                            }`}>Navigation</Text>
+                        <Ionicons name="map-outline" size={14} color={activeTab === 'navigation' ? '#0A0F1E' : '#9CA3AF'} />
+                        <Text className={`font-bold text-xs ${activeTab === 'navigation' ? 'text-[#0A0F1E]' : 'text-txtMuted'}`}>Navigation</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        onPress={() => { setActiveTab('map'); if (!mapFloor) openMapView(); }}
+                        className={`flex-1 py-2.5 rounded-xl flex-row items-center justify-center gap-1 ${activeTab === 'map' ? 'bg-[#3B82F6]' : ''}`}
+                    >
+                        <Ionicons name="navigate-circle-outline" size={14} color={activeTab === 'map' ? '#FFFFFF' : '#9CA3AF'} />
+                        <Text className={`font-bold text-xs ${activeTab === 'map' ? 'text-white' : 'text-txtMuted'}`}>Map View</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                         onPress={() => setActiveTab('smart')}
-                        className={`flex-1 py-2.5 rounded-xl flex-row items-center justify-center gap-1 ${activeTab === 'smart' ? 'bg-[#F59E0B]' : ''
-                            }`}
+                        className={`flex-1 py-2.5 rounded-xl flex-row items-center justify-center gap-1 ${activeTab === 'smart' ? 'bg-[#F59E0B]' : ''}`}
                     >
-                        <Ionicons name="sparkles-outline" size={16} color={activeTab === 'smart' ? '#0A0F1E' : '#9CA3AF'} />
-                        <Text className={`font-bold text-sm ${activeTab === 'smart' ? 'text-[#0A0F1E]' : 'text-txtMuted'
-                            }`}>Smart Assist</Text>
+                        <Ionicons name="sparkles-outline" size={14} color={activeTab === 'smart' ? '#0A0F1E' : '#9CA3AF'} />
+                        <Text className={`font-bold text-xs ${activeTab === 'smart' ? 'text-[#0A0F1E]' : 'text-txtMuted'}`}>Smart</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -754,14 +870,24 @@ export default function IndoorNavigationScreen() {
 
                             {/* ── Navigation Mode Controls ─────────────────── */}
                             {!navigating ? (
-                                <TouchableOpacity
-                                    onPress={startNavigating}
-                                    className="mb-5 bg-[#00D4AA] rounded-2xl py-3 flex-row items-center justify-center"
-                                    style={{ shadowColor: '#00D4AA', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 4 }}
-                                >
-                                    <Ionicons name="navigate" size={18} color="#0A0F1E" />
-                                    <Text className="text-[#0A0F1E] font-bold text-base ml-2">▶ Start Navigation</Text>
-                                </TouchableOpacity>
+                                <View className="mb-5" style={{ gap: 10 }}>
+                                    <TouchableOpacity
+                                        onPress={startNavigating}
+                                        className="bg-[#00D4AA] rounded-2xl py-3 flex-row items-center justify-center"
+                                        style={{ shadowColor: '#00D4AA', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 4 }}
+                                    >
+                                        <Ionicons name="navigate" size={18} color="#0A0F1E" />
+                                        <Text className="text-[#0A0F1E] font-bold text-base ml-2">▶ Start Navigation</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        onPress={openMapView}
+                                        className="bg-[#1D3461] rounded-2xl py-3 flex-row items-center justify-center"
+                                        style={{ borderWidth: 1.5, borderColor: '#3B82F6', shadowColor: '#3B82F6', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 8, elevation: 4 }}
+                                    >
+                                        <Ionicons name="navigate-circle-outline" size={18} color="#3B82F6" />
+                                        <Text style={{ color: '#3B82F6', fontWeight: '700', fontSize: 15, marginLeft: 8 }}>🗺️ View on Map</Text>
+                                    </TouchableOpacity>
+                                </View>
                             ) : (
                                 <View className="flex-row mb-5" style={{ gap: 10 }}>
                                     <TouchableOpacity
@@ -838,6 +964,170 @@ export default function IndoorNavigationScreen() {
                             ))}
                         </View>
                     )}
+                </ScrollView>
+            )}
+
+            {/* ════════ MAP VIEW TAB ════════ */}
+            {activeTab === 'map' && (
+                <ScrollView className="flex-1 px-5 py-4" showsVerticalScrollIndicator={false}>
+
+                    {/* Floor selector */}
+                    {building?.floors?.length > 0 && (
+                        <MapFloorSelector
+                            floors={building.floors}
+                            activeFloor={mapFloor}
+                            onFloorChange={loadMapFloorData}
+                        />
+                    )}
+
+                    {/* Route status banner */}
+                    {route && (
+                        <View
+                            style={{
+                                backgroundColor: '#0F2240',
+                                borderRadius: 16,
+                                padding: 14,
+                                marginBottom: 14,
+                                borderWidth: 1,
+                                borderColor: '#3B82F6',
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                            }}
+                        >
+                            <Ionicons name="git-branch-outline" size={20} color="#3B82F6" />
+                            <View style={{ flex: 1, marginLeft: 10 }}>
+                                <Text style={{ color: '#93C5FD', fontWeight: '800', fontSize: 13 }}>
+                                    {startRoom?.name} → {endRoom?.name}
+                                </Text>
+                                <Text style={{ color: '#6B7280', fontSize: 11, marginTop: 2 }}>
+                                    {route.distance?.toFixed(0)}m · {route.directions?.length} steps
+                                </Text>
+                            </View>
+                            <View style={{ backgroundColor: '#3B82F6', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 }}>
+                                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>ROUTE</Text>
+                            </View>
+                        </View>
+                    )}
+
+                    {/* Map */}
+                    <IndoorMapView
+                        rooms={mapRooms}
+                        connections={mapConnections}
+                        routeRoomIds={(route?.path || []).filter(id => mapRooms.some(r => r.id === id))}
+                        startRoomId={startRoom?.id}
+                        endRoomId={endRoom?.id}
+                        userRoomId={route?.directions?.[mapStepIndex]?.roomId}
+                    />
+
+                    {/* Current step card */}
+                    {route?.directions?.[mapStepIndex] && (
+                        <View
+                            style={{
+                                backgroundColor: '#111827',
+                                borderRadius: 20,
+                                padding: 16,
+                                marginTop: 16,
+                                borderLeftWidth: 4,
+                                borderLeftColor: mapNavigating ? '#22C55E' : '#3B82F6',
+                                borderWidth: 1,
+                                borderColor: '#1F2937',
+                            }}
+                        >
+                            <Text style={{ color: '#6B7280', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>
+                                Step {mapStepIndex + 1} of {route.directions.length}
+                            </Text>
+                            <Text style={{ color: '#F3F4F6', fontWeight: '700', fontSize: 16, lineHeight: 22 }}>
+                                {route.directions[mapStepIndex].instruction}
+                            </Text>
+                            {route.directions[mapStepIndex].floorNumber !== undefined && (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+                                    <Ionicons name="layers-outline" size={13} color="#6B7280" />
+                                    <Text style={{ color: '#6B7280', fontSize: 12, marginLeft: 4 }}>
+                                        Floor {route.directions[mapStepIndex].floorNumber}
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+                    )}
+
+                    {/* No route placeholder */}
+                    {!route && (
+                        <View style={{ alignItems: 'center', paddingVertical: 32 }}>
+                            <Ionicons name="navigate-circle-outline" size={52} color="#374151" />
+                            <Text style={{ color: '#6B7280', fontWeight: '700', fontSize: 16, marginTop: 12 }}>No route yet</Text>
+                            <Text style={{ color: '#4B5563', fontSize: 13, marginTop: 6, textAlign: 'center', paddingHorizontal: 24 }}>
+                                Go to Navigation tab, set start &amp; destination, then tap View on Map.
+                            </Text>
+                        </View>
+                    )}
+
+                    {/* Map navigation controls */}
+                    {route && (
+                        <View style={{ flexDirection: 'row', marginTop: 16, marginBottom: 24, gap: 10 }}>
+                            {!mapNavigating ? (
+                                <TouchableOpacity
+                                    onPress={startMapNavigation}
+                                    style={{
+                                        flex: 1,
+                                        backgroundColor: '#22C55E',
+                                        borderRadius: 18,
+                                        paddingVertical: 14,
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        shadowColor: '#22C55E',
+                                        shadowOffset: { width: 0, height: 4 },
+                                        shadowOpacity: 0.45,
+                                        shadowRadius: 10,
+                                        elevation: 6,
+                                    }}
+                                >
+                                    <Ionicons name="play" size={18} color="#fff" />
+                                    <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15, marginLeft: 8 }}>Start Map Nav</Text>
+                                </TouchableOpacity>
+                            ) : (
+                                <TouchableOpacity
+                                    onPress={stopMapNavigation}
+                                    style={{
+                                        flex: 1,
+                                        backgroundColor: '#374151',
+                                        borderRadius: 18,
+                                        paddingVertical: 14,
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}
+                                >
+                                    <Ionicons name="stop" size={18} color="#fff" />
+                                    <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15, marginLeft: 8 }}>■ Stop</Text>
+                                </TouchableOpacity>
+                            )}
+                            {/* Manual step controls */}
+                            <TouchableOpacity
+                                onPress={() => {
+                                    const prev = Math.max(0, mapStepIndex - 1);
+                                    setMapStepIndex(prev);
+                                    mapStepRef.current = prev;
+                                    if (route?.directions?.[prev]) VoiceHapticEngine.triggerInstruction(route.directions[prev], i18n.language);
+                                }}
+                                style={{ backgroundColor: '#1F2937', borderRadius: 18, paddingHorizontal: 18, paddingVertical: 14, justifyContent: 'center', borderWidth: 1, borderColor: '#374151' }}
+                            >
+                                <Ionicons name="chevron-back" size={20} color="#9CA3AF" />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    const next = Math.min((route?.directions?.length || 1) - 1, mapStepIndex + 1);
+                                    setMapStepIndex(next);
+                                    mapStepRef.current = next;
+                                    if (route?.directions?.[next]) VoiceHapticEngine.triggerInstruction(route.directions[next], i18n.language);
+                                }}
+                                style={{ backgroundColor: '#1F2937', borderRadius: 18, paddingHorizontal: 18, paddingVertical: 14, justifyContent: 'center', borderWidth: 1, borderColor: '#374151' }}
+                            >
+                                <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+                            </TouchableOpacity>
+                        </View>
+                    )}
+
                 </ScrollView>
             )}
 
