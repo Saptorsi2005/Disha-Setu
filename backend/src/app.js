@@ -25,6 +25,8 @@ const newsImpactRoutes = require('./routes/news-impact.routes');
 
 const app = express();
 
+app.set('trust proxy', 1);
+
 // ── Security Middleware ────────────────────────────────────────
 app.use(helmet());
 
@@ -50,7 +52,7 @@ app.use('/admin-panel', express.static('public'));
 // ── Rate Limiting ──────────────────────────────────────────────
 const limiter = rateLimit({
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
-    max: parseInt(process.env.RATE_LIMIT_MAX) || 100,
+    max: parseInt(process.env.RATE_LIMIT_MAX) || 500,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many requests, please try again later.' },
@@ -60,7 +62,7 @@ app.use('/api/', limiter);
 // Stricter limit on auth endpoints to prevent brute-force
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 50,
+    max: 150,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many authentication requests, please try again later.' }
