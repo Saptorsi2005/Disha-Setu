@@ -1,15 +1,13 @@
 /**
  * src/services/news-impact.service.js
- * Project News & Civic Insights Engine — Fault-tolerant Production Build
+ * Project News & Civic Insights Engine — Fast + Fault-tolerant Production Build
  *
- * Resilience layers:
- *  1. httpsGet() — Node https module, redirect following, timeout (not fetch)
- *  2. retryFetch() — 3-attempt cascade: quoted → unquoted → broad alias query
- *  3. multiQueryFetch() — runs 2-3 independent queries, merges results
- *  4. Per-query isolation — one query's 503 never kills the others
- *  5. Structured fallback — NEVER returns empty UI, always meaningful data
- *  6. Cache safety — only valid (non-empty) results are cached
- *  7. Full logging — every failure, retry, and success logged for Render
+ * Source priority:
+ *  1. Google News RSS  — 2 attempts max, 8s timeout, unquoted queries
+ *  2. NewsData.io API  — secondary (if NEWSDATA_API_KEY set in env)
+ *  3. Structured fallback — always returns meaningful UI, cached for 10 min
+ *
+ * Performance goals: < 3s response time, never hangs, never empty UI
  */
 
 'use strict';
@@ -37,7 +35,7 @@ const NOISE_RE = /\b(crime|murder|killed|death|rape|suicide|covid|coronavirus|pa
 // 1. LOW-LEVEL HTTPS GET — redirect-following, timeout-aware
 // ─────────────────────────────────────────────────────────────────────────────
 
-function httpsGet(urlStr, timeoutMs = 12000) {
+function httpsGet(urlStr, timeoutMs = 8000) {
     return new Promise((resolve, reject) => {
         const attempt = (currentUrl, redirectsLeft) => {
             let parsedUrl;
@@ -93,26 +91,66 @@ function httpsGet(urlStr, timeoutMs = 12000) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 2. RETRY CASCADE — 3-tier exponential back-off per URL
-//    Returns xml string or throws after all attempts fail.
+// 2. RETRY — 2 attempts max, minimal delay (fail fast)
+//    3-attempt cascades caused 10s+ waits when Google 503s every time.
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function fetchWithRetry(url, label) {
-    const DELAYS = [0, 800, 2000]; // ms between attempts
-    for (let attempt = 1; attempt <= 3; attempt++) {
+    const DELAYS = [0, 300]; // ms — fail fast: no long back-off
+    for (let attempt = 1; attempt <= 2; attempt++) {
         if (DELAYS[attempt - 1] > 0) {
             await new Promise(r => setTimeout(r, DELAYS[attempt - 1]));
         }
         try {
             const xml = await httpsGet(url);
-            if (attempt > 1) {
-                console.log(`[NewsImpact] ✅ "${label}" succeeded on attempt ${attempt}`);
-            }
+            if (attempt > 1) console.log(`[NewsImpact] ✅ "${label}" ok on attempt ${attempt}`);
             return xml;
         } catch (err) {
-            console.warn(`[NewsImpact] ⚠️  "${label}" attempt ${attempt}/3 failed: ${err.message}`);
-            if (attempt === 3) throw err;
+            console.warn(`[NewsImpact] ⚠️  "${label}" attempt ${attempt}/2 failed: ${err.message}`);
+            if (attempt === 2) throw err;
         }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2b. NEWSDATA.IO — secondary source (requires NEWSDATA_API_KEY in env)
+//     Only called if Google RSS returns 0 results or fails entirely.
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function fetchNewsDataApi(projectName, aliases) {
+    const apiKey = process.env.NEWSDATA_API_KEY;
+    if (!apiKey) return []; // not configured — skip silently
+
+    const t0 = Date.now();
+    try {
+        // Use major project keywords (not full name — better recall)
+        const q = projectName.split(/\s+/).filter(w => w.length > 3 && !STOP_WORDS.has(w.toLowerCase())).slice(0, 3).join(' ') || projectName;
+        const url = `https://newsdata.io/api/1/news?apikey=${apiKey}&q=${encodeURIComponent(q)}&country=in&language=en&category=politics,business,top`;
+        console.log(`[NewsImpact] 🌐 NewsData.io query: "${q}"`);
+
+        const json = await httpsGet(url, 8000);
+        const parsed = JSON.parse(json);
+
+        if (parsed.status !== 'success' || !Array.isArray(parsed.results)) {
+            console.warn('[NewsImpact] NewsData.io: unexpected response', parsed.status);
+            return [];
+        }
+
+        const items = parsed.results
+            .filter(r => r.title && !NOISE_RE.test(r.title.toLowerCase()))
+            .filter(r => aliases.some(alias => r.title.toLowerCase().includes(alias)))
+            .map(r => ({
+                title:          r.title.replace(/ - [^-]+$/, '').trim(),
+                link:           r.link || r.source_url || '',
+                source:         r.source_id || 'NewsData',
+                published_date: r.pubDate || '',
+            }));
+
+        console.log(`[NewsImpact] 🌐 NewsData.io: ${parsed.results.length} raw → ${items.length} relevant (${Date.now()-t0}ms)`);
+        return items;
+    } catch (err) {
+        console.warn(`[NewsImpact] 🌐 NewsData.io failed: ${err.message}`);
+        return [];
     }
 }
 
@@ -176,28 +214,22 @@ function buildAliases(projectName) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 5. QUERY CASCADE BUILDER
-//    Produces 3 progressively-broader queries for a project.
-//    If query[0] is 503'd, query[1] and query[2] are tried.
+//    Unquoted queries only — quoted queries trigger more aggressive 503 blocking.
+//    2 queries: specific name, then major-words fallback.
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildQueryCascade(cleanName, aliases, category) {
-    // Tier 1: exact quoted name
-    const q1 = `"${cleanName}" India`;
+function buildQueryCascade(cleanName, aliases) {
+    // Q1: full unquoted name — specific but not quoted (less blocking)
+    const q1 = `${cleanName} India infrastructure`;
 
-    // Tier 2: unquoted name + one primary alias (if different)
-    const primaryAlias = aliases.find(a => a !== cleanName.toLowerCase() && a.length > 5) || '';
-    const q2 = primaryAlias
-        ? `${cleanName} OR "${primaryAlias}" India infrastructure`
-        : `${cleanName} infrastructure India`;
-
-    // Tier 3: major words only — broadest, least likely to 503
+    // Q2: major words only — broadest, no stop words, least rate-limited
     const majorWords = cleanName.toLowerCase().split(/\s+/)
         .filter(w => w.length > 3 && !STOP_WORDS.has(w));
-    const q3 = majorWords.length > 0
+    const q2 = majorWords.length > 0
         ? `${majorWords.join(' ')} infrastructure India`
-        : `${cleanName} India`;
+        : null;
 
-    return [q1, q2, q3].filter((q, i, arr) => arr.indexOf(q) === i); // dedupe
+    return [q1, q2].filter(Boolean).filter((q, i, arr) => arr.indexOf(q) === i);
 }
 
 function rssUrl(query) {
@@ -272,16 +304,16 @@ function makeFallback(projectName) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Fetches one RSS query with 3-attempt retry.
- * Returns [] (not throws) on permanent failure so other queries still run.
+ * Fetches one RSS query. Returns [] (not throws) on failure.
+ * Per-query isolation: one 503 never kills sibling queries.
  */
 async function safeFetchAndFilter(query, aliases, label) {
     try {
+        const t0 = Date.now();
         const url = rssUrl(query);
-        console.log(`[NewsImpact] 🔍 Query[${label}]: ${query}`);
-        const xml   = await fetchWithRetry(url, label);
-        const raw   = parseRssItems(xml);
-        console.log(`[NewsImpact] 📄 [${label}] raw=${raw.length}`);
+        console.log(`[NewsImpact] 🔍 [${label}]: ${query}`);
+        const xml = await fetchWithRetry(url, label);
+        const raw = parseRssItems(xml);
 
         const filtered = raw.filter(item => {
             const t = item.title.toLowerCase();
@@ -289,14 +321,11 @@ async function safeFetchAndFilter(query, aliases, label) {
             return aliases.some(alias => t.includes(alias));
         });
 
-        console.log(`[NewsImpact] ✅ [${label}] relevant=${filtered.length}`);
-        if (filtered.length > 0) {
-            console.log(`[NewsImpact] 📰 [${label}] samples:`, filtered.slice(0, 2).map(a => `"${a.title.slice(0,60)}"`));
-        }
+        console.log(`[NewsImpact] ✅ [${label}] raw=${raw.length} relevant=${filtered.length} (${Date.now()-t0}ms)`);
         return filtered;
     } catch (err) {
-        console.error(`[NewsImpact] ❌ [${label}] permanently failed: ${err.message}`);
-        return [];  // isolation: don't throw — other queries still run
+        console.error(`[NewsImpact] ❌ [${label}] failed: ${err.message}`);
+        return [];
     }
 }
 
@@ -323,6 +352,7 @@ exports.getProjectNews = async (projectName, area = '', category = '') => {
         cache.delete(cacheKey);
     }
 
+    const t0 = Date.now();
     console.log(`[NewsImpact] 🚀 START: "${cleanName}" | area="${area}" | category="${category}"`);
 
     const aliases = buildAliases(cleanName);
@@ -332,10 +362,10 @@ exports.getProjectNews = async (projectName, area = '', category = '') => {
     // Bharat Mandapam — hardcoded high-confidence path (still with resilience)
     // ──────────────────────────────────────────────────────────────────────
     if (cleanName.toLowerCase().includes('bharat mandapam')) {
+        // Unquoted queries only — quoted ones get 503'd more aggressively
         const queries = [
-            { q: '"Bharat Mandapam"', label: 'BM-exact' },
-            { q: 'Bharat Mandapam India',    label: 'BM-loose' },
-            { q: '"Pragati Maidan" IECC',    label: 'BM-alias' },
+            { q: 'Bharat Mandapam India',  label: 'BM-name' },
+            { q: 'Pragati Maidan IECC',    label: 'BM-alias' },
         ];
 
         const allItems = [];
@@ -371,31 +401,32 @@ exports.getProjectNews = async (projectName, area = '', category = '') => {
 
         if (top.length > 0) {
             cache.set(cacheKey, { timestamp: Date.now(), data: finalData });
-            console.log(`[NewsImpact] ✅ Bharat Mandapam: ${top.length} articles cached`);
+            console.log(`[NewsImpact] ✅ Bharat Mandapam: ${top.length} articles cached (${Date.now()-t0}ms)`);
         } else {
-            console.warn('[NewsImpact] ⚠️  Bharat Mandapam: all queries returned 0 articles — using fallback');
-            return makeFallback(cleanName);
+            // Fallback — also cached so repeated requests don't keep hitting 503
+            console.warn('[NewsImpact] ⚠️  Bharat Mandapam: 0 articles — caching structured fallback');
+            const fb = makeFallback(cleanName);
+            cache.set(cacheKey, { timestamp: Date.now(), data: fb });
+            return fb;
         }
         return finalData;
     }
 
     // ──────────────────────────────────────────────────────────────────────
-    // Generic project — 3-query cascade, run in parallel for speed
-    // Per-query isolation: each has independent try/catch via safeFetchAndFilter
+    // Generic project — 2 RSS queries in parallel + NewsData.io if needed
     // ──────────────────────────────────────────────────────────────────────
-    const queryCascade = buildQueryCascade(cleanName, aliases, category);
-    console.log(`[NewsImpact] 🎯 Query cascade: ${JSON.stringify(queryCascade)}`);
+    const queryCascade = buildQueryCascade(cleanName, aliases);
+    console.log(`[NewsImpact] 🎯 RSS queries: ${JSON.stringify(queryCascade)}`);
 
-    const seenLinks  = new Set();
-    const allItems   = [];
+    const seenLinks = new Set();
+    const allItems  = [];
 
-    const results = await Promise.allSettled(
-        queryCascade.map((q, i) =>
-            safeFetchAndFilter(q, aliases, `Q${i + 1}`)
-        )
+    // Run RSS queries in parallel (fail-fast, per-query isolated)
+    const rssResults = await Promise.allSettled(
+        queryCascade.map((q, i) => safeFetchAndFilter(q, aliases, `Q${i + 1}`))
     );
 
-    for (const result of results) {
+    for (const result of rssResults) {
         if (result.status === 'fulfilled') {
             for (const item of result.value) {
                 if (!seenLinks.has(item.link)) {
@@ -406,10 +437,24 @@ exports.getProjectNews = async (projectName, area = '', category = '') => {
         }
     }
 
-    // Still nothing? Log clearly and return structured fallback
+    // ── Secondary source: NewsData.io (only if RSS returned nothing) ────────
     if (allItems.length === 0) {
-        console.warn(`[NewsImpact] ⚠️  All queries returned 0 articles for "${cleanName}" — returning structured fallback`);
-        return makeFallback(cleanName);
+        console.log(`[NewsImpact] 📡 RSS returned 0 — trying NewsData.io secondary source`);
+        const ndItems = await fetchNewsDataApi(cleanName, aliases);
+        for (const item of ndItems) {
+            if (!seenLinks.has(item.link)) {
+                seenLinks.add(item.link);
+                allItems.push(item);
+            }
+        }
+    }
+
+    // ── All sources exhausted → structured fallback (cached) ───────────────
+    if (allItems.length === 0) {
+        console.warn(`[NewsImpact] ⚠️  All sources returned 0 articles for "${cleanName}" (${Date.now()-t0}ms) — caching fallback`);
+        const fb = makeFallback(cleanName);
+        cache.set(cacheKey, { timestamp: Date.now(), data: fb }); // cache fallback to avoid repeated slow calls
+        return fb;
     }
 
     // Sort DESC, limit
@@ -421,9 +466,8 @@ exports.getProjectNews = async (projectName, area = '', category = '') => {
         ...extractInsights(top),
     };
 
-    // Cache only non-empty results
     cache.set(cacheKey, { timestamp: Date.now(), data: finalData });
-    console.log(`[NewsImpact] ✅ DONE: "${cleanName}" — ${top.length} articles cached`);
+    console.log(`[NewsImpact] ✅ DONE: "${cleanName}" — ${top.length} articles cached (${Date.now()-t0}ms total)`);
 
     return finalData;
 };
