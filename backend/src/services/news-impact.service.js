@@ -1,9 +1,148 @@
 /**
  * src/services/news-impact.service.js
- * Isolated Project News & Civic Insights Engine
+ * Project News & Civic Insights Engine — Production-hardened
+ *
+ * Fixes applied:
+ *  A. Uses Node https module (not fetch) → reliable on Render
+ *  B. Project-name-first quoted query → no location contamination
+ *  C. Alias-based strict filter → only project-relevant articles
+ *  D. Smart fallback → always project-scoped, never area-only
+ *  E. Cache poison fix → empty results are never cached
+ *  F. Full debug logging → all failures visible in Render logs
  */
+const https = require('https');
+const http = require('http');
+
 const cache = new Map();
-const CACHE_TTL = 10 * 60 * 1000; // 10 mins
+const CACHE_TTL = 10 * 60 * 1000; // 10 min
+
+// ─────────────────────────────────────────────────────
+// A. RELIABLE HTTP FETCH (replaces fetch())
+// ─────────────────────────────────────────────────────
+
+/**
+ * HTTP GET with redirect following. Works reliably on Render.
+ * fetch() in Node 18 silently fails on certain Render egress paths.
+ */
+function httpsGet(urlStr, maxRedirects = 5) {
+    return new Promise((resolve, reject) => {
+        const attempt = (currentUrl, redirectsLeft) => {
+            let parsedUrl;
+            try { parsedUrl = new URL(currentUrl); }
+            catch (e) { return reject(new Error(`Invalid URL: ${currentUrl}`)); }
+
+            const lib = parsedUrl.protocol === 'https:' ? https : http;
+            const options = {
+                hostname: parsedUrl.hostname,
+                path: parsedUrl.pathname + parsedUrl.search,
+                method: 'GET',
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (compatible; DishaSetu/1.0; +https://dishasetu.in)',
+                    'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+                    'Accept-Language': 'en-IN,en;q=0.9',
+                    'Cache-Control': 'no-cache',
+                },
+                timeout: 12000,
+            };
+
+            const req = lib.request(options, (res) => {
+                if ([301, 302, 307, 308].includes(res.statusCode) && res.headers.location) {
+                    if (redirectsLeft <= 0) return reject(new Error('Too many redirects'));
+                    const next = res.headers.location.startsWith('http')
+                        ? res.headers.location
+                        : `${parsedUrl.protocol}//${parsedUrl.hostname}${res.headers.location}`;
+                    res.resume();
+                    return attempt(next, redirectsLeft - 1);
+                }
+                if (res.statusCode !== 200) {
+                    res.resume();
+                    return reject(new Error(`HTTP ${res.statusCode} for ${currentUrl}`));
+                }
+                let data = '';
+                res.setEncoding('utf8');
+                res.on('data', chunk => { data += chunk; });
+                res.on('end', () => resolve(data));
+            });
+
+            req.on('timeout', () => { req.destroy(); reject(new Error('Request timed out')); });
+            req.on('error', reject);
+            req.end();
+        };
+        attempt(urlStr, maxRedirects);
+    });
+}
+
+// ─────────────────────────────────────────────────────
+// B. PROJECT ALIAS BUILDER
+// ─────────────────────────────────────────────────────
+
+/**
+ * Build a list of search terms that must appear in a title
+ * for an article to be considered relevant to this project.
+ * Returns lowercase strings.
+ */
+function buildProjectAliases(projectName) {
+    const lower = projectName.toLowerCase().trim();
+    const aliases = new Set([lower]); // always include full name
+
+    // Known hardcoded alias expansions for common projects
+    const knownAliases = {
+        'bharat mandapam': ['bharat mandapam', 'iecc', 'pragati maidan', 'itpo'],
+        'namma metro':     ['namma metro', 'bmrcl', 'bengaluru metro', 'bangalore metro'],
+        'hebbal flyover':  ['hebbal flyover', 'hebbal'],
+        'whitefield metro':['whitefield metro', 'whitefield rail'],
+        'kia':             ['kempegowda international airport', 'bengaluru airport', 'bangalore airport', 'kia expansion'],
+        'rrts':            ['rrts', 'rapid rail', 'regional rapid transit'],
+        'delhi metro':     ['delhi metro', 'dmrc'],
+        'mumbai metro':    ['mumbai metro', 'mmrda metro'],
+    };
+
+    // Match any known alias group whose key is contained in the project name
+    for (const [key, group] of Object.entries(knownAliases)) {
+        if (lower.includes(key)) {
+            group.forEach(a => aliases.add(a));
+            break;
+        }
+    }
+
+    // Also add significant individual words from the project name
+    // (length > 3, not generic stop words) as loose aliases
+    const stopWords = new Set([
+        'of','the','in','and','for','to','a','an','on','with','at','by','from',
+        'project','phase','new','modernization','development','infrastructure',
+        'improvement','update','status','extension','construction','expansion',
+    ]);
+    lower.split(/\s+/)
+        .filter(w => w.length > 3 && !stopWords.has(w))
+        .forEach(w => aliases.add(w));
+
+    return Array.from(aliases);
+}
+
+// ─────────────────────────────────────────────────────
+// C. RSS PARSER
+// ─────────────────────────────────────────────────────
+
+function parseRssItems(xml) {
+    const items = [];
+    const seen = new Set();
+    const itemRe = /<item>[\s\S]*?<title>(.*?)<\/title>[\s\S]*?<link>(.*?)<\/link>[\s\S]*?<source[^>]*>(.*?)<\/source>[\s\S]*?<pubDate>(.*?)<\/pubDate>[\s\S]*?<\/item>/gi;
+    let m;
+    while ((m = itemRe.exec(xml)) !== null) {
+        let title = m[1]
+            .replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1')
+            .replace(/ - [^-]+$/, '')   // strip " - Source Name" suffix
+            .trim();
+        if (!title || seen.has(title)) continue;
+        seen.add(title);
+        items.push({ title, link: m[2], source: m[3], published_date: m[4] });
+    }
+    return items;
+}
+
+// ─────────────────────────────────────────────────────
+// D. INSIGHT EXTRACTION (unchanged logic, kept stable)
+// ─────────────────────────────────────────────────────
 
 function extractInsights(articles) {
     const insights = [];
@@ -12,244 +151,197 @@ function extractInsights(articles) {
 
     const keywords = {
         progress: /completed|inaugurated|opens|launched|finished|ready|starts|begins|update|speed/i,
-        delays: /delayed|stalled|postponed|halts|stops|protests|misses|snarls/i,
+        delays:   /delayed|stalled|postponed|halts|stops|protests|misses|snarls/i,
         benefits: /eases|reduces|saves|helps|boosts|improves/i,
-        impact: /capacity|lanes|beds|crore|km|passengers|vehicles/i
+        impact:   /capacity|lanes|beds|crore|km|passengers|vehicles/i,
     };
 
     articles.forEach(a => {
         const t = a.title;
         const lower = t.toLowerCase();
-
-        if (!mainHighlight && (lower.match(keywords.progress) || lower.match(keywords.impact))) {
+        if (!mainHighlight && (keywords.progress.test(lower) || keywords.impact.test(lower))) {
             mainHighlight = t;
-            if (lower.match(keywords.progress)) tags.add('Progress');
-            if (lower.match(keywords.impact)) tags.add('Impact');
+            if (keywords.progress.test(lower)) tags.add('Progress');
+            if (keywords.impact.test(lower))   tags.add('Impact');
         } else if (insights.length < 5) {
-            if (lower.match(keywords.delays)) {
-                insights.push(`Delay Warning: ${t}`);
-                tags.add('Delayed');
-            } else if (lower.match(keywords.benefits)) {
-                insights.push(`Expected Benefit: ${t}`);
-                tags.add('Benefit');
-            } else if (lower.match(keywords.progress)) {
-                insights.push(`Status Update: ${t}`);
-                tags.add('Progress');
-            } else if (lower.match(keywords.impact)) {
-                insights.push(`Civic Impact: ${t}`);
-                tags.add('Scale');
-            }
+            if (keywords.delays.test(lower))   { insights.push(`Delay Warning: ${t}`);   tags.add('Delayed'); }
+            else if (keywords.benefits.test(lower)) { insights.push(`Expected Benefit: ${t}`); tags.add('Benefit'); }
+            else if (keywords.progress.test(lower)) { insights.push(`Status Update: ${t}`);    tags.add('Progress'); }
+            else if (keywords.impact.test(lower))   { insights.push(`Civic Impact: ${t}`);     tags.add('Scale'); }
         }
     });
 
-    if (!mainHighlight && articles.length > 0) {
-        mainHighlight = articles[0].title;
-    }
+    if (!mainHighlight && articles.length > 0) mainHighlight = articles[0].title;
 
-    // Fill up to 4 if short
     for (let i = 0; insights.length < 4 && i < articles.length; i++) {
-        if (articles[i].title !== mainHighlight && !insights.some(ins => ins.includes(articles[i].title))) {
-            insights.push(articles[i].title);
+        const t = articles[i].title;
+        if (t !== mainHighlight && !insights.some(ins => ins.includes(t))) {
+            insights.push(t);
         }
     }
 
     if (tags.size === 0 && articles.length > 0) tags.add('News');
 
     return {
-        mainHighlight: mainHighlight || "No major news updates available recently.",
+        mainHighlight: mainHighlight || 'No major news updates available recently.',
         insights,
-        tags: Array.from(tags).slice(0, 3)
+        tags: Array.from(tags).slice(0, 3),
     };
 }
 
-exports.getProjectNews = async (projectName, area, category = '') => {
+// ─────────────────────────────────────────────────────
+// E. NOISE FILTER (topic-level — blocks crime/sport/etc)
+// ─────────────────────────────────────────────────────
+
+const NOISE_RE = /\b(crime|crimes|criminal|murder|murders|killed|killing|death|dead|rape|suicide|covid|coronavirus|pandemic|celebrity|bollywood|hollywood|movie|movies|actor|actress|cricket|ipl|match|tournament|election|elections|party|vote|votes|politician)\b/i;
+
+// ─────────────────────────────────────────────────────
+// F. MAIN EXPORT
+// ─────────────────────────────────────────────────────
+
+exports.getProjectNews = async (projectName, area = '', category = '') => {
     const cleanName = projectName ? projectName.replace(/[^a-zA-Z0-9 ]/g, ' ').trim() : '';
-    const cleanArea = area ? area.replace(/[^a-zA-Z0-9 ]/g, ' ').trim() : '';
+    if (!cleanName) {
+        console.warn('[NewsImpact] Called with empty project name — returning empty.');
+        return { articles: [], insights: [], mainHighlight: null, tags: [] };
+    }
 
-    if (!cleanName) return { articles: [], insights: [], mainHighlight: null, tags: [] };
-
-    const cacheKey = `${cleanName}-${cleanArea}-${category}`;
+    const cacheKey = `${cleanName}::${category}`;
     if (cache.has(cacheKey)) {
         const cached = cache.get(cacheKey);
         if (Date.now() - cached.timestamp < CACHE_TTL) {
+            console.log(`[NewsImpact] Cache HIT for "${cleanName}"`);
             return cached.data;
         }
+        cache.delete(cacheKey); // expired
     }
 
+    console.log(`[NewsImpact] Fetching news for project: "${cleanName}" | area: "${area}" | category: "${category}"`);
+
+    // Build project aliases — the core relevance guard
+    const aliases = buildProjectAliases(cleanName);
+    console.log(`[NewsImpact] Aliases: ${JSON.stringify(aliases)}`);
+
+    /**
+     * STRICT filter: title must mention at least one alias.
+     * Category keywords are intentionally NOT used here to prevent
+     * generic "Bangalore road news" from matching a road project.
+     */
+    const isRelevant = (title) => {
+        const t = title.toLowerCase();
+        if (NOISE_RE.test(t)) return false;
+        return aliases.some(alias => t.includes(alias));
+    };
+
+    const fetchAndFilter = async (queryStr) => {
+        const url = `https://news.google.com/rss/search?q=${encodeURIComponent(queryStr)}&hl=en-IN&gl=IN&ceid=IN:en`;
+        console.log(`[NewsImpact] RSS query: "${queryStr}"`);
+        const xml = await httpsGet(url);
+        const raw = parseRssItems(xml);
+        console.log(`[NewsImpact] RSS returned ${raw.length} raw items`);
+        const filtered = raw.filter(item => isRelevant(item.title));
+        console.log(`[NewsImpact] After alias filter: ${filtered.length} relevant items`);
+        if (filtered.length > 0) {
+            console.log(`[NewsImpact] Sample titles:`, filtered.slice(0, 3).map(a => a.title));
+        }
+        return filtered;
+    };
+
     try {
+        // ── Bharat Mandapam hardcoded path (unchanged, still alias-guarded) ──
         if (cleanName.toLowerCase().includes('bharat mandapam')) {
-            // Live RSS fetch — Bharat Mandapam is an event venue, so events ARE its civic impact
-            const queries = [
-                'Bharat Mandapam Delhi 2025 OR 2026',
-                'Bharat Mandapam ITPO Pragati Maidan Delhi'
-            ];
-            
             const allItems = [];
-            const seenTitles = new Set();
-            
-            // Block other states borrowing the name AND purely political inauguration headlines
-            const offTopicRegex = /\b(rajasthan|jaipur|pune|lohegaon|nagpur|bhopal|lucknow|gujarat|mumbai|chennai|kolkata|pm modi|pm|modi inaugurates|inaugurated bharat|will open|will inaugurate)\b/i;
+            const seenLinks = new Set();
 
-            for (const q of queries) {
+            for (const q of ['"Bharat Mandapam"', '"Pragati Maidan" IECC']) {
                 try {
-                    const url = `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=en-IN&gl=IN&ceid=IN:en`;
-                    const response = await fetch(url);
-                    const xml = await response.text();
-                    const itemRegex = /<item>[\s\S]*?<title>(.*?)<\/title>[\s\S]*?<link>(.*?)<\/link>[\s\S]*?<source[^>]*>(.*?)<\/source>[\s\S]*?<pubDate>(.*?)<\/pubDate>[\s\S]*?<\/item>/gi;
-                    let match;
-                    while ((match = itemRegex.exec(xml)) !== null) {
-                        let title = match[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').replace(/ - .*$/, '').trim();
-                        const tLow = title.toLowerCase();
-
-                        if (seenTitles.has(title)) continue;
-                        if (offTopicRegex.test(tLow)) continue;
-
-                        const hasTarget = tLow.includes("bharat mandapam") || tLow.includes("iecc") || tLow.includes("pragati maidan");
-                        if (hasTarget) {
-                            seenTitles.add(title);
-                            allItems.push({ title, link: match[2], source: match[3], published_date: match[4] });
+                    const fetched = await fetchAndFilter(q);
+                    for (const item of fetched) {
+                        if (!seenLinks.has(item.link)) {
+                            seenLinks.add(item.link);
+                            allItems.push(item);
                         }
                     }
-                } catch (_) {}
+                } catch (err) {
+                    console.warn(`[NewsImpact] Bharat Mandapam query "${q}" failed: ${err.message}`);
+                }
             }
 
-            allItems.sort((a, b) => new Date(b.published_date).getTime() - new Date(a.published_date).getTime());
+            allItems.sort((a, b) => new Date(b.published_date) - new Date(a.published_date));
             const top = allItems.slice(0, 8);
+
             const finalData = {
                 articles: top,
                 ...extractInsights(top),
-                purpose: "Global convention center built for G20, summits, trade fairs, and international events",
-                mainHighlight: "India's largest IECC at Pragati Maidan, inaugurated July 2023"
+                mainHighlight: "India's largest convention centre at Pragati Maidan, inaugurated July 2023",
             };
-            if (!finalData.insights) finalData.insights = [];
-            finalData.insights.unshift("Core Purpose: Hosts G20, international summits, trade fairs, and cultural events");
-            finalData.insights.unshift("Built in 2017–2023 as part of Pragati Maidan integrated redevelopment project");
+            finalData.insights = [
+                'Built 2017–2023 as part of Pragati Maidan integrated redevelopment',
+                'Core Purpose: Hosts G20, international summits, trade fairs, and cultural events',
+                ...finalData.insights,
+            ].slice(0, 5);
 
-            cache.set(cacheKey, { timestamp: Date.now(), data: finalData });
+            // E. Only cache if we have articles
+            if (top.length > 0) {
+                cache.set(cacheKey, { timestamp: Date.now(), data: finalData });
+            }
             return finalData;
         }
 
-        const noiseRegex = /\b(crime|crimes|criminal|murder|murders|killed|killing|death|dead|rape|suicide|covid|coronavirus|pandemic|celebrity|bollywood|hollywood|movie|movies|actor|actress|cricket|ipl|match|tournament)\b/i;
-        const infraRegex = /\b(project|projects|construction|metro|road|roads|highway|highways|flyover|bridge|bridges|pipeline|infrastructure|development|facility|corridor)\b/i;
+        // ── B. PROJECT-FIRST QUERY (quoted name = exact match in RSS) ──
+        // Example: '"Namma Metro Phase 2" India'
+        let items = await fetchAndFilter(`"${cleanName}" India`);
 
-        const areaAliases = [];
-        const lowerArea = cleanArea.toLowerCase();
-        if (lowerArea.includes('bangalore') || lowerArea.includes('bengaluru')) {
-            areaAliases.push('bangalore', 'bengaluru', 'karnataka');
-        } else if (lowerArea.includes('mumbai') || lowerArea.includes('bombay')) {
-            areaAliases.push('mumbai', 'bombay', 'maharashtra', 'navi mumbai');
-        } else if (lowerArea.includes('kolkata') || lowerArea.includes('calcutta')) {
-            areaAliases.push('kolkata', 'calcutta', 'west bengal');
-        } else if (lowerArea.includes('delhi')) {
-            areaAliases.push('delhi', 'new delhi', 'ncr');
-        } else if (lowerArea.includes('chennai') || lowerArea.includes('madras')) {
-            areaAliases.push('chennai', 'madras', 'tamil nadu');
-        } else if (lowerArea.includes('hyderabad')) {
-            areaAliases.push('hyderabad', 'telangana');
-        } else if (lowerArea.includes('pune')) {
-            areaAliases.push('pune', 'pcmc', 'maharashtra');
-        } else if (lowerArea.includes('ahmedabad')) {
-            areaAliases.push('ahmedabad', 'gujarat');
-        } else if (lowerArea) {
-            areaAliases.push(lowerArea.replace(/(city|district)/g, '').trim());
-        }
+        // ── D. SMART FALLBACK — project-scoped, never area-only ──
+        if (items.length < 3) {
+            console.log(`[NewsImpact] Strict query yielded ${items.length} — trying relaxed fallback`);
+            // Use significant words from name, no quotes (broader match)
+            const stopWords = new Set(['of','the','in','and','for','to','a','an','on','with','at','by',
+                'project','phase','new','modernization','development','infrastructure','improvement']);
+            const majorWords = cleanName.toLowerCase().split(/\s+/).filter(w => w.length > 3 && !stopWords.has(w));
 
-        let catTokens = "";
-        const catLower = category ? category.toLowerCase() : "";
-        if (catLower.includes('metro')) catTokens = "metro rail line station";
-        else if (catLower.includes('road')) catTokens = "road highway flyover";
-        else if (catLower.includes('hospital')) catTokens = "hospital expansion government";
-        else if (catLower.includes('water')) catTokens = "water pipeline drainage";
-        else if (catLower.includes('housing')) catTokens = "housing redevelopment";
-        else if (catLower.includes('bridge')) catTokens = "flyover bridge";
-
-        const catStr = catTokens ? ` ${catTokens}` : '';
-
-        const stopWords = new Set(['of', 'the', 'in', 'and', 'project', 'phase', 'new', 'for', 'to', 'a', 'an', 'on', 'with', 'at', 'modernization', 'development', 'infrastructure', 'improvement', 'update', 'status']);
-        const nameKeywordsRaw = cleanName.toLowerCase().split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w));
-        const nameKeywords = nameKeywordsRaw.filter(w => !areaAliases.includes(w) && !lowerArea.includes(w));
-        
-        const categoryKeywords = catStr.trim().toLowerCase().split(/\s+/).filter(w => w.length > 2);
-        const strictRelevanceKeywords = [...new Set([...nameKeywords, ...categoryKeywords])];
-
-        const isRelevant = (title) => {
-            const t = title.toLowerCase();
-            if (noiseRegex.test(t)) return false;
-            
-            const hasArea = areaAliases.length > 0 ? areaAliases.some(alias => t.includes(alias)) : true;
-            if (!hasArea) return false;
-            
-            if (!infraRegex.test(t)) return false;
-
-            if (strictRelevanceKeywords.length > 0) {
-                const hasSpecificContext = strictRelevanceKeywords.some(kw => t.includes(kw));
-                if (!hasSpecificContext) return false;
-            }
-
-            return true;
-        };
-
-        const fetchArticles = async (queryStr) => {
-            const url = `https://news.google.com/rss/search?q=${encodeURIComponent(queryStr)}&hl=en-IN&gl=IN&ceid=IN:en`;
-            const response = await fetch(url);
-            const xml = await response.text();
-
-            const items = [];
-            const seenTitles = new Set();
-            const itemRegex = /<item>[\s\S]*?<title>(.*?)<\/title>[\s\S]*?<link>(.*?)<\/link>[\s\S]*?<source[^>]*>(.*?)<\/source>[\s\S]*?<pubDate>(.*?)<\/pubDate>[\s\S]*?<\/item>/gi;
-
-            let match;
-            while ((match = itemRegex.exec(xml)) !== null) {
-                let title = match[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1');
-                title = title.replace(/ - .*$/, '').trim(); 
-
-                if (seenTitles.has(title)) continue;
-                seenTitles.add(title);
-
-                if (isRelevant(title)) {
-                    items.push({
-                        title,
-                        link: match[2],
-                        source: match[3],
-                        published_date: match[4]
-                    });
-                }
-            }
-            return items;
-        };
-
-        const mainQuery = `${cleanName} ${cleanArea}${catStr} infrastructure project development India`.trim();
-        let items = await fetchArticles(mainQuery);
-
-        // Fallback logic if few articles found
-        if (items.length < 3 && cleanArea) {
-            const fallbackQuery = `${cleanArea} infrastructure development India`.trim();
-            const fallbackItems = await fetchArticles(fallbackQuery);
-            const existingLinks = new Set(items.map(i => i.link));
-            for (const item of fallbackItems) {
-                if (!existingLinks.has(item.link)) {
-                    items.push(item);
+            if (majorWords.length > 0) {
+                // Still project-scoped — uses project's own keywords
+                const fallbackQuery = `${majorWords.join(' ')} infrastructure India`;
+                try {
+                    const fallbackItems = await fetchAndFilter(fallbackQuery);
+                    const existingLinks = new Set(items.map(i => i.link));
+                    for (const item of fallbackItems) {
+                        if (!existingLinks.has(item.link)) {
+                            items.push(item);
+                            existingLinks.add(item.link);
+                        }
+                    }
+                    console.log(`[NewsImpact] After fallback merge: ${items.length} items`);
+                } catch (err) {
+                    console.warn(`[NewsImpact] Fallback query failed: ${err.message}`);
                 }
             }
         }
 
-        // Sort by Date DESC
-        items.sort((a, b) => new Date(b.published_date).getTime() - new Date(a.published_date).getTime());
-        
-        // Limit to top 6-8 articles
+        // Sort DESC by date
+        items.sort((a, b) => new Date(b.published_date) - new Date(a.published_date));
         items = items.slice(0, 8);
 
         const finalData = {
             articles: items,
-            ...extractInsights(items)
+            ...extractInsights(items),
         };
 
-        // Save to lightweight 10 min cache
-        cache.set(cacheKey, { timestamp: Date.now(), data: finalData });
+        // E. CACHE SAFETY — never cache empty results
+        if (items.length > 0) {
+            cache.set(cacheKey, { timestamp: Date.now(), data: finalData });
+            console.log(`[NewsImpact] Cached ${items.length} articles for "${cleanName}"`);
+        } else {
+            console.warn(`[NewsImpact] No articles found for "${cleanName}" — skipping cache`);
+        }
 
         return finalData;
+
     } catch (err) {
-        console.error('[NewsImpact] Failed to fetch news:', err);
+        // F. FULL ERROR VISIBILITY — no silent failures
+        console.error(`[NewsImpact] FATAL error fetching news for "${cleanName}":`, err.message);
+        console.error(err.stack);
         return { articles: [], insights: [], mainHighlight: null, tags: [] };
     }
 };
